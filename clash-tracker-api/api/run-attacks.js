@@ -5,7 +5,7 @@ const turso = createClient({
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
-const ROYALE_API_BASE = 'http://45.79.218.79/v1';
+const ROYALE_API_BASE = 'https://proxy.royaleapi.dev/v1';
 
 async function callRoyaleAPI(path) {
   const res = await fetch(`${ROYALE_API_BASE}${path}`, {
