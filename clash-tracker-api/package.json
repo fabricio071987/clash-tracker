@@ -1,0 +1,8 @@
+{
+  "name": "clash-tracker-api",
+  "version": "1.0.0",
+  "description": "API para Clash Clan Tracker",
+  "dependencies": {
+    "@libsql/client": "^0.3.0"
+  }
+}
