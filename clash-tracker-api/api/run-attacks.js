@@ -57,7 +57,7 @@ async function collectClanAttacks(clan) {
     const clanInfo = await callRoyaleAPIWithRetry(`/clans/${encodeTag(clan.tag)}`);
     
     const memberMap = new Map();
-    (clanInfo.members || []).forEach(m => {
+    (clanInfo.memberList || []).forEach(m => {
       memberMap.set(m.tag, { name: m.name, rank: m.rank || m.role || 'member' });
     });
 
