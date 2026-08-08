@@ -5,19 +5,45 @@ const turso = createClient({
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
-const ROYALE_API_BASE = 'http://45.79.218.79/v1';
+// Usa a variável de ambiente ou o IP padrão
+const ROYALE_API_BASE = process.env.ROYALE_API_BASE || 'http://45.79.218.79/v1';
 
 async function callRoyaleAPI(path) {
+  const token = process.env.ROYALE_API_TOKEN;
+  
+  console.log(`[API] Chamando: ${path}`);
+  console.log(`[API] Token: ${token ? 'Presente' : 'AUSENTE'}`);
+  console.log(`[API] Base URL: ${ROYALE_API_BASE}`);
+  
   const res = await fetch(`${ROYALE_API_BASE}${path}`, {
     headers: {
-      Authorization: `Bearer ${process.env.ROYALE_API_TOKEN}`,
+      'Authorization': `Bearer ${token}`,
       'User-Agent': 'clash-clan-tracker-worker',
     },
   });
+  
   if (!res.ok) {
-    throw new Error(`RoyaleAPI ${path} -> HTTP ${res.status}`);
+    const errorText = await res.text();
+    console.error(`[API] Erro ${res.status}: ${errorText}`);
+    throw new Error(`RoyaleAPI ${path} -> HTTP ${res.status} - ${errorText}`);
   }
   return res.json();
+}
+
+async function callRoyaleAPIWithRetry(path, retries = 2) {
+  let lastErr;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await callRoyaleAPI(path);
+    } catch (err) {
+      lastErr = err;
+      console.log(`[API] Tentativa ${attempt + 1} falhou: ${err.message}`);
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+      }
+    }
+  }
+  throw lastErr;
 }
 
 function encodeTag(tag) {
@@ -27,101 +53,115 @@ function encodeTag(tag) {
 async function calculatePromotions(clan) {
   console.log(`[PROMO] Calculando promoções para ${clan.tag}`);
   
-  const clanInfo = await callRoyaleAPI(`/clans/${encodeTag(clan.tag)}`);
-  
-  const memberMap = new Map();
-  (clanInfo.members || []).forEach(m => {
-    memberMap.set(m.tag, { name: m.name, rank: m.rank || m.role || 'member' });
-  });
+  try {
+    const clanInfo = await callRoyaleAPIWithRetry(`/clans/${encodeTag(clan.tag)}`);
+    
+    const memberMap = new Map();
+    (clanInfo.members || []).forEach(m => {
+      memberMap.set(m.tag, { name: m.name, rank: m.rank || m.role || 'member' });
+    });
 
-  if (memberMap.size === 0) {
-    console.log(`[PROMO] Nenhum membro encontrado para ${clan.tag}`);
-    return;
-  }
-
-  const log = await callRoyaleAPI(`/clans/${encodeTag(clan.tag)}/riverracelog?limit=25`);
-  const items = log.items || [];
-  if (items.length === 0) {
-    console.log(`[PROMO] Nenhum histórico encontrado para ${clan.tag}`);
-    return;
-  }
-
-  const fameByMember = new Map();
-  for (const item of items) {
-    const standing = (item.standings || []).find((s) => s.clan?.tag === clan.tag);
-    const participants = standing?.clan?.participants || [];
-    for (const p of participants) {
-      if (!memberMap.has(p.tag)) continue;
-      if (!fameByMember.has(p.tag)) fameByMember.set(p.tag, []);
-      fameByMember.get(p.tag).push(p.fame || 0);
+    if (memberMap.size === 0) {
+      console.log(`[PROMO] Nenhum membro encontrado para ${clan.tag}`);
+      return;
     }
+
+    const log = await callRoyaleAPIWithRetry(`/clans/${encodeTag(clan.tag)}/riverracelog?limit=25`);
+    const items = log.items || [];
+    if (items.length === 0) {
+      console.log(`[PROMO] Nenhum histórico encontrado para ${clan.tag}`);
+      return;
+    }
+
+    console.log(`[PROMO] ${items.length} semanas encontradas para ${clan.tag}`);
+
+    const fameByMember = new Map();
+    for (const item of items) {
+      const standing = (item.standings || []).find((s) => s.clan?.tag === clan.tag);
+      const participants = standing?.clan?.participants || [];
+      for (const p of participants) {
+        if (!memberMap.has(p.tag)) continue;
+        if (!fameByMember.has(p.tag)) fameByMember.set(p.tag, []);
+        fameByMember.get(p.tag).push(p.fame || 0);
+      }
+    }
+
+    const referenceSectionIndex = items[0]?.sectionIndex ?? null;
+    const now = new Date().toISOString();
+    let savedCount = 0;
+
+    for (const [memberTag, weeksFame] of fameByMember.entries()) {
+      const memberInfo = memberMap.get(memberTag);
+      const last4 = weeksFame.slice(0, 4);
+      const last8 = weeksFame.slice(0, 8);
+      const sum4 = last4.reduce((a, b) => a + b, 0);
+      const sum8 = last8.reduce((a, b) => a + b, 0);
+      const avg4 = sum4 / 4;
+      const avg8 = sum8 / 8;
+
+      console.log(`[PROMO] ${memberInfo?.name}: avg4=${avg4.toFixed(0)}, avg8=${avg8.toFixed(0)}`);
+
+      await turso.execute({
+        sql: `
+          INSERT INTO promotions
+            (clan_tag, member_tag, member_name, member_rank,
+             reference_section_index,
+             sum_4w, avg_4w, eligible_elder, 
+             sum_8w, avg_8w, eligible_colider, 
+             calculated_at, is_active)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(clan_tag, member_tag, calculated_at) DO UPDATE SET
+            member_name = excluded.member_name,
+            member_rank = excluded.member_rank,
+            sum_4w = excluded.sum_4w,
+            avg_4w = excluded.avg_4w,
+            eligible_elder = excluded.eligible_elder,
+            sum_8w = excluded.sum_8w,
+            avg_8w = excluded.avg_8w,
+            eligible_colider = excluded.eligible_colider,
+            is_active = excluded.is_active
+        `,
+        args: [
+          clan.tag,
+          memberTag,
+          memberInfo?.name || '',
+          memberInfo?.rank || 'member',
+          referenceSectionIndex,
+          sum4,
+          avg4,
+          avg4 >= 2500 ? 1 : 0,
+          sum8,
+          avg8,
+          avg8 >= 2500 ? 1 : 0,
+          now,
+          1
+        ]
+      });
+      savedCount++;
+    }
+
+    console.log(`[PROMO] ${savedCount} promoções salvas para ${clan.tag}`);
+
+    // Marca inativos
+    const allMemberTags = Array.from(memberMap.keys());
+    if (allMemberTags.length > 0) {
+      const placeholders = allMemberTags.map(() => '?').join(',');
+      await turso.execute({
+        sql: `UPDATE promotions SET is_active = 0 
+              WHERE clan_tag = ? AND calculated_at = ? 
+              AND member_tag NOT IN (${placeholders})`,
+        args: [clan.tag, now, ...allMemberTags]
+      });
+    }
+
+  } catch (err) {
+    console.error(`[${clan.tag}] Erro nas promoções:`, err.message);
+    throw err;
   }
-
-  const referenceSectionIndex = items[0]?.sectionIndex ?? null;
-  const now = new Date().toISOString();
-
-  for (const [memberTag, weeksFame] of fameByMember.entries()) {
-    const memberInfo = memberMap.get(memberTag);
-    const last4 = weeksFame.slice(0, 4);
-    const last8 = weeksFame.slice(0, 8);
-    const sum4 = last4.reduce((a, b) => a + b, 0);
-    const sum8 = last8.reduce((a, b) => a + b, 0);
-    const avg4 = sum4 / 4;
-    const avg8 = sum8 / 8;
-
-    await turso.execute({
-      sql: `
-        INSERT INTO promotions
-          (clan_tag, member_tag, member_name, member_rank,
-           reference_section_index,
-           sum_4w, avg_4w, eligible_elder, 
-           sum_8w, avg_8w, eligible_colider, 
-           calculated_at, is_active)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(clan_tag, member_tag, calculated_at) DO UPDATE SET
-          member_name = excluded.member_name,
-          member_rank = excluded.member_rank,
-          sum_4w = excluded.sum_4w,
-          avg_4w = excluded.avg_4w,
-          eligible_elder = excluded.eligible_elder,
-          sum_8w = excluded.sum_8w,
-          avg_8w = excluded.avg_8w,
-          eligible_colider = excluded.eligible_colider,
-          is_active = excluded.is_active
-      `,
-      args: [
-        clan.tag,
-        memberTag,
-        memberInfo?.name || '',
-        memberInfo?.rank || 'member',
-        referenceSectionIndex,
-        sum4,
-        avg4,
-        avg4 >= 2500 ? 1 : 0,
-        sum8,
-        avg8,
-        avg8 >= 2500 ? 1 : 0,
-        now,
-        1
-      ]
-    });
-  }
-
-  const allMemberTags = Array.from(memberMap.keys());
-  if (allMemberTags.length > 0) {
-    const placeholders = allMemberTags.map(() => '?').join(',');
-    await turso.execute({
-      sql: `UPDATE promotions SET is_active = 0 
-            WHERE clan_tag = ? AND calculated_at = ? 
-            AND member_tag NOT IN (${placeholders})`,
-      args: [clan.tag, now, ...allMemberTags]
-    });
-  }
-
-  console.log(`[PROMO] Promoções finalizadas para ${clan.tag}`);
 }
 
 export default async function handler(req, res) {
+  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   
@@ -130,9 +170,13 @@ export default async function handler(req, res) {
   }
 
   try {
+    console.log('[CRON] Iniciando cálculo de promoções...');
+    
     const clans = await turso.execute(
       'SELECT tag, name FROM clans WHERE enabled = 1'
     );
+
+    console.log(`[CRON] ${clans.rows.length} clã(s) encontrado(s)`);
 
     for (const clan of clans.rows) {
       try {
@@ -142,13 +186,18 @@ export default async function handler(req, res) {
       }
     }
 
+    console.log('[CRON] Cálculo de promoções finalizado.');
+
     res.status(200).json({ 
       success: true, 
       message: 'Cálculo de promoções executado com sucesso.',
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Erro:', error);
-    res.status(500).json({ success: false, error: error.message });
+    console.error('Erro no handler:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
   }
 }
