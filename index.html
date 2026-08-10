@@ -1,3 +1,8 @@
+Aqui está o arquivo **`index.html` completo e atualizado**. Ele já vem com a estrutura corrigida para exibir todos os membros, as médias de 4 e 8 semanas, e as seções de status perfeitamente integradas com a sua API na Vercel.
+
+Basta copiar todo o código abaixo, colar no seu arquivo `index.html` e salvar no GitHub:
+
+```html
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -25,7 +30,7 @@
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    background: var(--bg );
+    background: var(--bg);
     color: var(--text);
     font-family: 'Inter', sans-serif;
     padding: 32px 24px 80px;
@@ -166,15 +171,13 @@
     <div class="config-grid">
       <input id="apiUrl" readonly style="opacity: 0.6;" value="https://clash-tracker-six.vercel.app" />
       <select id="clanSelect"><option value="">Selecione um clã</option></select>
-      <button onclick="connect( )">Conectar</button>
+      <button onclick="connect()">Conectar</button>
     </div>
   </div>
 
   <div class="panel">
     <h2 style="margin-bottom:14px">Promoções e Desempenho</h2>
-    <div id="promoElderSection" class="promo-section"></div>
-    <div id="promoCoLeaderSection" class="promo-section"></div>
-    <div style="margin-top: 24px; border-top: 1px solid var(--border); padding-top: 20px;">
+    <div style="margin-top: 10px;">
       <h3 style="color: var(--text-muted); font-size: 13px;">📊 Tabela Geral de Membros</h3>
       <div id="promoFullTableWrap"></div>
     </div>
@@ -188,13 +191,10 @@ const API_BASE_URL = 'https://clash-tracker-six.vercel.app';
 
 const state = {
   clanTag: '',
-  warDays: [],
   promotions: [],
-  promoSortMode: 'avg4w',
-  promoSortAsc: false,
 };
 
-function setStatus(connected, text ) {
+function setStatus(connected, text) {
   document.getElementById('statusDot').className = connected ? 'dot live' : 'dot';
   document.getElementById('statusText').textContent = text;
 }
@@ -240,13 +240,12 @@ function renderPromotions() {
   const fullTableWrap = document.getElementById('promoFullTableWrap');
   const ref = document.getElementById('promoRef');
 
-  if (!state.promotions.length) {
-    fullTableWrap.innerHTML = '<div class="empty-state">Nenhum dado de promoção encontrado no banco. Execute a rota /api/run-promotions para popular.</div>';
+  if (!state.promotions || state.promotions.length === 0) {
+    fullTableWrap.innerHTML = '<div class="empty-state">Nenhum dado de promoção encontrado no banco. Acesse /api/run-promotions para gerar.</div>';
     ref.textContent = '';
     return;
   }
 
-  // Pega a execução mais recente sem filtrar por guerra ativa para garantir que apareçam todos
   const latestRun = state.promotions[0].calculated_at;
   const latest = state.promotions.filter(p => p.calculated_at === latestRun);
   const refSection = latest[0]?.reference_section_index;
@@ -279,8 +278,7 @@ function renderPromotions() {
             return `
               <tr>
                 <td>${index + 1}</td>
-                <td><strong>${p.member_name}</strong>  
-<small style="color:var(--text-faint);">${p.member_tag}</small></td>
+                <td><strong>${p.member_name}</strong><br><small style="color:var(--text-faint);">${p.member_tag}</small></td>
                 <td><span class="promo-rank">${p.member_rank || 'membro'}</span></td>
                 <td style="text-align:center; font-family:'JetBrains Mono',monospace;">${Math.round(p.avg4w)}</td>
                 <td style="text-align:center; font-family:'JetBrains Mono',monospace;">${Math.round(p.avg8w)}</td>
@@ -295,11 +293,11 @@ function renderPromotions() {
     </div>
   `;
 
-  ref.textContent = `Calculado em ${new Date(latestRun).toLocaleString('pt-BR')}`;
+  ref.textContent = `Referente à guerra ${refSection} · Calculado em ${new Date(latestRun).toLocaleString('pt-BR')}`;
 }
 
-// Inicia ao carregar a página
 window.onload = connect;
 </script>
 </body>
 </html>
+```
