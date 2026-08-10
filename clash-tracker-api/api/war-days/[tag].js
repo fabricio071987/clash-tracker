@@ -14,29 +14,28 @@ export default async function handler(req, res) {
   }
 
   const { tag } = req.query;
+  if (!tag) {
+    return res.status(400).json({ error: 'Tag do clã não informada' });
+  }
+
   const decodedTag = decodeURIComponent(tag);
 
   try {
     const result = await Promise.race([
       turso.execute({
         sql: `
-          SELECT 
-            clan_tag, section_index, period_index, 
-            member_tag, member_name, member_rank,
-            decks_used, decks_total, updated_at, is_active,
-            RANK() OVER (PARTITION BY section_index ORDER BY period_index) AS day_number
-          FROM war_days
-          WHERE clan_tag = ? AND is_active = 1
+          SELECT * FROM war_days 
+          WHERE clan_tag = ? AND is_active = 1 
           ORDER BY member_name ASC
         `,
         args: [decodedTag]
       }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Turso')), 6000))
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Turso (25s)')), 25000))
     ]);
 
     res.status(200).json(result.rows);
   } catch (error) {
-    console.error('Erro:', error.message);
-    res.status(200).json([]);
+    console.error('Erro em war-days:', error.message);
+    res.status(500).json({ error: `Erro na consulta ao banco: ${error.message}` });
   }
 }
