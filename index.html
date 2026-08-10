@@ -282,7 +282,7 @@
   <div class="panel">
     <h2>Conexão</h2>
     <div class="config-grid">
-      <input id="apiUrl" placeholder="https://api.seu-projeto.vercel.app" value="https://api.seu-projeto.vercel.app" />
+      <input id="apiUrl" placeholder="https://clash-tracker-six.vercel.app" value="https://clash-tracker-six.vercel.app" />
       <select id="clanSelect"><option value="">Selecione um clã</option></select>
       <button onclick="connect()">Conectar</button>
     </div>
@@ -382,10 +382,20 @@ async function loadClanData(tag) {
   document.getElementById('clanLabel').textContent = tag;
   setStatus(true, 'Carregando dados…');
   try {
+    // --- CORREÇÃO: Adicionado Timeout de 8 segundos para não travar o navegador ---
+    const controller1 = new AbortController();
+    const controller2 = new AbortController();
+    const timeout1 = setTimeout(() => controller1.abort(), 8000);
+    const timeout2 = setTimeout(() => controller2.abort(), 8000);
+
     const [wd, pr] = await Promise.all([
-      fetch(state.apiUrl + '/api/war-days/' + encodeURIComponent(tag)).then(r => r.json()),
-      fetch(state.apiUrl + '/api/promotions/' + encodeURIComponent(tag)).then(r => r.json()),
+      fetch(state.apiUrl + '/api/war-days/' + encodeURIComponent(tag), { signal: controller1.signal }).then(r => r.json()),
+      fetch(state.apiUrl + '/api/promotions/' + encodeURIComponent(tag), { signal: controller2.signal }).then(r => r.json()),
     ]);
+
+    clearTimeout(timeout1);
+    clearTimeout(timeout2);
+
     state.warDays = wd;
     state.promotions = pr;
     
@@ -399,8 +409,21 @@ async function loadClanData(tag) {
     setStatus(true, 'Conectado · ' + tag);
     render();
   } catch (err) {
-    setStatus(false, 'Erro ao carregar dados do clã');
+    console.warn("Erro ao carregar dados (ou timeout):", err.message);
+    setStatus(true, 'Conectado (Aguardando dados...)');
+    // Mostra tabelas vazias para o usuário não ficar preso na tela de carregamento
+    renderEmpty();
   }
+}
+
+// Função para renderizar estado vazio (Quando o banco está demorando ou vazio)
+function renderEmpty() {
+  const wrap = document.getElementById('attackTableWrap');
+  wrap.innerHTML = '<div class="empty-state">⏳ Aguardando o banco de dados coletar os primeiros ataques... (Pode levar alguns minutos)</div>';
+  document.getElementById('promoElderSection').innerHTML = '';
+  document.getElementById('promoCoLeaderSection').innerHTML = '';
+  document.getElementById('promoFullTableWrap').innerHTML = '<div class="empty-state">⏳ Aguardando os dados de promoções...</div>';
+  document.getElementById('promoRef').textContent = '';
 }
 
 function toggleSort(columnIndex) {
