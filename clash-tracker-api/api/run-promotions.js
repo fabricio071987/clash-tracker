@@ -57,7 +57,7 @@ async function calculatePromotions(clan) {
       return { clan: clan.tag, status: 'no_members' };
     }
 
-    const log = await callRoyaleAPIWithRetry(`/clans/${encodeTag(clan.tag)}/riverracelog?limit=25`);
+    const log = await callRoyaleAPIWithRetry(`/clans/${encodeTag(clan.tag)}/riverracelog?limit=10`);
     const items = log.items || [];
     if (items.length === 0) {
       return { clan: clan.tag, status: 'no_history' };
@@ -78,24 +78,29 @@ async function calculatePromotions(clan) {
     const now = new Date().toISOString();
     const statements = [];
 
+    // LIMPEZA AUTOMÁTICA: Apaga as promoções antigas deste clã antes de inserir as novas
+    statements.push({
+      sql: `DELETE FROM promotions WHERE clan_tag = ?`,
+      args: [clan.tag]
+    });
+
+    // MONTAGEM DOS NOVOS DADOS
     for (const [memberTag, weeksFame] of fameByMember.entries()) {
       const memberInfo = memberMap.get(memberTag);
       const last4 = weeksFame.slice(0, 4);
       const last8 = weeksFame.slice(0, 8);
       const sum4 = last4.reduce((a, b) => a + b, 0);
       const sum8 = last8.reduce((a, b) => a + b, 0);
-      const avg4 = sum4 / 4;
-      const avg8 = sum8 / 8;
+      const avg4 = last4.length ? sum4 / last4.length : 0;
+      const avg8 = last8.length ? sum8 / last8.length : 0;
 
       statements.push({
         sql: `
           INSERT INTO promotions
             (clan_tag, member_tag, member_name, member_rank,
-             reference_section_index,
-             sum_4w, avg_4w, eligible_elder, 
-             sum_8w, avg_8w, eligible_colider, 
-             calculated_at, is_active)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             reference_section_index, sum_4w, avg_4w, eligible_elder, 
+             sum_8w, avg_8w, eligible_colider, calculated_at, is_active)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
         `,
         args: [
           clan.tag,
@@ -109,8 +114,7 @@ async function calculatePromotions(clan) {
           sum8,
           avg8,
           avg8 >= 2500 ? 1 : 0,
-          now,
-          1
+          now
         ]
       });
     }
@@ -122,8 +126,8 @@ async function calculatePromotions(clan) {
       ]);
     }
 
-    console.log(`[PROMO] ${statements.length} membros salvos para ${clan.tag}`);
-    return { clan: clan.tag, status: 'success', saved: statements.length };
+    console.log(`[PROMO] Sucesso: ${statements.length - 1} membros gravados para ${clan.tag}`);
+    return { clan: clan.tag, status: 'success', saved: statements.length - 1 };
   } catch (err) {
     console.error(`[${clan.tag}] Erro nas promoções:`, err.message);
     throw err;
@@ -139,6 +143,7 @@ export default async function handler(req, res) {
     const { tag } = req.query;
     let clans = [];
 
+    // Se passar a tag (?tag=%23XYZ), processa só ela. Senão, busca todos os clãs do banco.
     if (tag) {
       clans = [{ tag: decodeURIComponent(tag) }];
     } else {
