@@ -24,7 +24,7 @@ export default async function handler(req, res) {
           SELECT * FROM promotions 
           WHERE clan_tag = ? AND is_active = 1 
           ORDER BY calculated_at DESC
-          LIMIT 1
+          
         `,
         args: [decodedTag]
       }),
