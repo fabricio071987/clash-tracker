@@ -155,35 +155,38 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  try {
-    console.log('[CRON] Iniciando coleta de ataques...');
-    
-    const clans = await turso.execute(
-      'SELECT tag, name FROM clans WHERE enabled = 1'
-    );
+  // --- CORREÇÃO DO TIMEOUT DA VERCEL ---
+  // 1. Já manda a resposta imediata para o cron-job.org (para a Vercel parar de contar o tempo)
+  res.status(200).json({ 
+    success: true, 
+    message: 'Coleta de ataques iniciada em background!',
+    timestamp: new Date().toISOString()
+  });
 
-    console.log(`[CRON] ${clans.rows.length} clã(s) encontrado(s)`);
+  // 2. O processamento pesado roda em segundo plano (setTimeout 0)
+  setTimeout(async () => {
+    try {
+      console.log('[CRON] Iniciando coleta de ataques...');
+      
+      const clans = await turso.execute(
+        'SELECT tag, name FROM clans WHERE enabled = 1'
+      );
 
-    for (const clan of clans.rows) {
-      try {
-        await collectClanAttacks(clan);
-      } catch (err) {
-        console.error(`Erro no clã ${clan.tag}:`, err.message);
+      console.log(`[CRON] ${clans.rows.length} clã(s) encontrado(s)`);
+
+      for (const clan of clans.rows) {
+        try {
+          await collectClanAttacks(clan);
+        } catch (err) {
+          console.error(`Erro no clã ${clan.tag}:`, err.message);
+        }
       }
+
+      console.log('[CRON] Coleta de ataques finalizada.');
+      
+    } catch (error) {
+      console.error('Erro no processamento em background:', error);
     }
-
-    console.log('[CRON] Coleta de ataques finalizada.');
-
-    res.status(200).json({ 
-      success: true, 
-      message: 'Coleta de ataques executada com sucesso.',
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Erro no handler:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
-    });
-  }
+  }, 0);
+  // ------------------------------------
 }
