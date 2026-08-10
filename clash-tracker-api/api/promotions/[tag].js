@@ -14,11 +14,13 @@ export default async function handler(req, res) {
   }
 
   const { tag } = req.query;
+  if (!tag) {
+    return res.status(400).json({ error: 'Tag do clã não informada' });
+  }
+
   const decodedTag = decodeURIComponent(tag);
 
   try {
-    // CORREÇÃO DEFINITIVA: Sem LIMIT, mas com ORDER BY nome. 
-    // O Turso lê tudo, mas a Vercel envia aos poucos.
     const result = await Promise.race([
       turso.execute({
         sql: `
@@ -29,12 +31,12 @@ export default async function handler(req, res) {
         `,
         args: [decodedTag]
       }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Turso')), 6000))
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Turso (15s)')), 15000))
     ]);
 
     res.status(200).json(result.rows);
   } catch (error) {
-    console.error('Erro:', error.message);
-    res.status(200).json([]);
+    console.error('Erro em promotions:', error.message);
+    res.status(500).json({ error: `Erro na consulta ao banco: ${error.message}` });
   }
 }
