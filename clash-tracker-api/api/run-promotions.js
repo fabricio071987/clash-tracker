@@ -169,35 +169,38 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  try {
-    console.log('[CRON] Iniciando cálculo de promoções...');
-    
-    const clans = await turso.execute(
-      'SELECT tag, name FROM clans WHERE enabled = 1'
-    );
+  // --- CORREÇÃO DO TIMEOUT DA VERCEL ---
+  // 1. Já manda a resposta imediata (Vercel para de contar o tempo)
+  res.status(200).json({ 
+    success: true, 
+    message: 'Cálculo de promoções iniciado em background!',
+    timestamp: new Date().toISOString()
+  });
 
-    console.log(`[CRON] ${clans.rows.length} clã(s) encontrado(s)`);
+  // 2. Processamento pesado roda em segundo plano (setTimeout 0)
+  setTimeout(async () => {
+    try {
+      console.log('[CRON] Iniciando cálculo de promoções em background...');
+      
+      const clans = await turso.execute(
+        'SELECT tag, name FROM clans WHERE enabled = 1'
+      );
 
-    for (const clan of clans.rows) {
-      try {
-        await calculatePromotions(clan);
-      } catch (err) {
-        console.error(`Erro no clã ${clan.tag}:`, err.message);
+      console.log(`[CRON] ${clans.rows.length} clã(s) encontrado(s)`);
+
+      for (const clan of clans.rows) {
+        try {
+          await calculatePromotions(clan);
+        } catch (err) {
+          console.error(`Erro no clã ${clan.tag}:`, err.message);
+        }
       }
+
+      console.log('[CRON] Cálculo de promoções finalizado.');
+      
+    } catch (error) {
+      console.error('Erro no processamento em background:', error);
     }
-
-    console.log('[CRON] Cálculo de promoções finalizado.');
-
-    res.status(200).json({ 
-      success: true, 
-      message: 'Cálculo de promoções executado com sucesso.',
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Erro no handler:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
-    });
-  }
+  }, 0);
+  // ------------------------------------
 }
