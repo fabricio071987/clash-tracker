@@ -8,23 +8,31 @@ const turso = createClient({
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
 
   const { tag } = req.query;
-  if (!tag) return res.status(400).json({ error: 'Tag do clã não informada' });
+  if (!tag) {
+    return res.status(400).json({ error: 'Tag do clã não informada' });
+  }
 
   const decodedTag = decodeURIComponent(tag);
 
   try {
-    const result = await turso.execute({
-      sql: `
-        SELECT * FROM war_days 
-        WHERE clan_tag = ? 
-        ORDER BY period_index DESC, member_name ASC 
-        LIMIT 20
-      `,
-      args: [decodedTag]
-    });
+    const result = await Promise.race([
+      turso.execute({
+        sql: `
+          SELECT * FROM war_days 
+          WHERE clan_tag = ? AND is_active = 1 
+          ORDER BY period_index DESC, member_name ASC
+          LIMIT 20
+        `,
+        args: [decodedTag]
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Turso (25s)')), 25000))
+    ]);
 
     res.status(200).json(result.rows);
   } catch (error) {
