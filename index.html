@@ -25,7 +25,7 @@
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    background: var(--bg );
+    background: var(--bg);
     color: var(--text);
     font-family: 'Inter', sans-serif;
     padding: 32px 24px 80px;
@@ -166,7 +166,7 @@
     <div class="config-grid">
       <input id="apiUrl" readonly style="opacity: 0.6;" value="https://clash-tracker-six.vercel.app" />
       <select id="clanSelect"><option value="">Selecione um clã</option></select>
-      <button onclick="connect( )">Conectar</button>
+      <button onclick="connect()">Conectar</button>
     </div>
   </div>
 
@@ -182,14 +182,17 @@
 </div>
 
 <script>
-const API_BASE_URL = 'https://clash-tracker-six.vercel.app';
+// Usamos string vazia para requisições relativas no mesmo domínio Vercel
+const API_BASE_URL = window.location.hostname.includes('vercel.app') 
+  ? '' 
+  : 'https://clash-tracker-six.vercel.app';
 
 const state = {
   clanTag: '',
   promotions: [],
 };
 
-function setStatus(connected, text ) {
+function setStatus(connected, text) {
   document.getElementById('statusDot').className = connected ? 'dot live' : 'dot';
   document.getElementById('statusText').textContent = text;
 }
@@ -197,37 +200,58 @@ function setStatus(connected, text ) {
 async function connect() {
   setStatus(false, 'Conectando…');
   try {
-    const res = await fetch(API_BASE_URL + '/api/clans');
+    const res = await fetch(`${API_BASE_URL}/api/clans`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    
     const clans = await res.json();
     const sel = document.getElementById('clanSelect');
-    sel.innerHTML = '<option value="">Selecione um clã</option>' +
-      clans.map(c => `<option value="${c.tag}">${c.name || c.tag}</option>`).join('');
-    sel.onchange = () => loadClanData(sel.value);
-    setStatus(clans.length > 0, clans.length > 0 ? clans.length + ' clã(s) encontrado(s)' : 'Nenhum clã cadastrado');
-    if (clans.length > 0) {
-      sel.value = clans[0].tag;
-      loadClanData(clans[0].tag);
+    
+    if (!Array.isArray(clans) || clans.length === 0) {
+      sel.innerHTML = '<option value="">Nenhum clã cadastrado</option>';
+      setStatus(false, 'Nenhum clã cadastrado no banco');
+      return;
     }
+
+    sel.innerHTML = '<option value="">Selecione um clã</option>' +
+      clans.map(c => `<option value="${encodeURIComponent(c.tag)}">${c.name || c.tag}</option>`).join('');
+    
+    sel.onchange = () => loadClanData(sel.value);
+    setStatus(true, `${clans.length} clã(s) encontrado(s)`);
+    
+    // Seleciona e carrega o primeiro clã automaticamente
+    sel.value = encodeURIComponent(clans[0].tag);
+    loadClanData(sel.value);
   } catch (err) {
+    console.error("Erro no connect:", err);
     setStatus(false, 'Erro ao conectar: ' + err.message);
   }
 }
 
-async function loadClanData(tag) {
-  if (!tag) return;
-  state.clanTag = tag;
-  document.getElementById('clanLabel').textContent = tag;
+async function loadClanData(encodedTag) {
+  if (!encodedTag) return;
+  
+  const rawTag = decodeURIComponent(encodedTag);
+  state.clanTag = rawTag;
+  document.getElementById('clanLabel').textContent = rawTag;
   setStatus(true, 'Carregando dados…');
-  try {
-    const res = await fetch(API_BASE_URL + '/api/promotions/' + encodeURIComponent(tag));
-    const pr = await res.json();
 
-    state.promotions = pr;
-    setStatus(true, 'Conectado · ' + tag);
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/promotions/${encodedTag}`);
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || `HTTP ${res.status}`);
+    }
+
+    const pr = await res.json();
+    state.promotions = Array.isArray(pr) ? pr : [];
+    
+    setStatus(true, 'Conectado · ' + rawTag);
     renderPromotions();
   } catch (err) {
-    console.warn("Erro ao carregar dados:", err.message);
-    setStatus(true, 'Conectado (Erro ao buscar dados)');
+    console.error("Erro ao carregar dados:", err);
+    setStatus(false, 'Erro: ' + err.message);
+    document.getElementById('promoFullTableWrap').innerHTML = 
+      `<div class="empty-state" style="color: var(--danger);">Erro ao carregar dados: ${err.message}</div>`;
   }
 }
 
@@ -236,14 +260,14 @@ function renderPromotions() {
   const ref = document.getElementById('promoRef');
 
   if (!state.promotions || state.promotions.length === 0) {
-    fullTableWrap.innerHTML = '<div class="empty-state">Nenhum dado de promoção encontrado no banco. Acesse /api/run-promotions para gerar.</div>';
+    fullTableWrap.innerHTML = '<div class="empty-state">Nenhum dado de promoção encontrado para este clã no banco. Execute a rota <code>/api/run-promotions</code> para gerar os dados.</div>';
     ref.textContent = '';
     return;
   }
 
   const latestRun = state.promotions[0].calculated_at;
   const latest = state.promotions.filter(p => p.calculated_at === latestRun);
-  const refSection = latest[0]?.reference_section_index;
+  const refSection = latest[0]?.reference_section_index ?? 'N/A';
 
   const allMembers = latest.map(p => ({
     ...p,
@@ -289,7 +313,8 @@ function renderPromotions() {
     </div>
   `;
 
-  ref.textContent = `Referente à guerra ${refSection} · Calculado em ${new Date(latestRun).toLocaleString('pt-BR')}`;
+  const dateFormatted = latestRun ? new Date(latestRun).toLocaleString('pt-BR') : 'Data desconhecida';
+  ref.textContent = `Referente à guerra ${refSection} · Calculado em ${dateFormatted}`;
 }
 
 window.onload = connect;
