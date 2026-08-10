@@ -46,19 +46,19 @@ async function collectClanAttacks(clan) {
   console.log(`[ATTACKS] Coletando dados do clã ${clan.tag}`);
   
   try {
-    const clanInfo = await callRoyaleAPIWithRetry(`/clans/${encodeTag(clan.tag)}`);
+    const race = await callRoyaleAPIWithRetry(`/clans/${encodeTag(clan.tag)}/currentriverrace`);
     
+    // Se NÃO for dia de guerra, encerra sem tocar no banco (preserva todo o histórico gravado)
+    if (race.periodType !== 'warDay') {
+      console.log(`[${clan.tag}] Não é dia de guerra. Histórico preservado no banco.`);
+      return { clan: clan.tag, status: 'skipped_not_warday' };
+    }
+
+    const clanInfo = await callRoyaleAPIWithRetry(`/clans/${encodeTag(clan.tag)}`);
     const memberMap = new Map();
     (clanInfo.memberList || []).forEach(m => {
       memberMap.set(m.tag, { name: m.name, rank: m.rank || m.role || 'member' });
     });
-
-    const race = await callRoyaleAPIWithRetry(`/clans/${encodeTag(clan.tag)}/currentriverrace`);
-    
-    if (race.periodType !== 'warDay') {
-      console.log(`[${clan.tag}] Não é dia de guerra. Pulando.`);
-      return { clan: clan.tag, status: 'skipped_not_warday' };
-    }
 
     const sectionIndex = race.sectionIndex;
     const periodIndex = race.periodIndex;
@@ -66,13 +66,12 @@ async function collectClanAttacks(clan) {
     const now = new Date().toISOString();
 
     if (participants.length === 0) {
-      console.log(`[${clan.tag}] Nenhum participante encontrado.`);
       return { clan: clan.tag, status: 'no_participants' };
     }
 
     const statements = [];
 
-    // 1. INSERÇÃO/ATUALIZAÇÃO DOS MEMBROS NA GUERRA ATUAL
+    // Insere ou atualiza o dia de guerra atual
     for (const p of participants) {
       if (!memberMap.has(p.tag)) continue;
       const memberInfo = memberMap.get(p.tag);
@@ -105,7 +104,7 @@ async function collectClanAttacks(clan) {
       });
     }
 
-    // 2. LIMPEZA AUTOMÁTICA: Deleta tudo que passar das últimas 20 rodadas do clã
+    // Mantém no banco apenas as últimas 20 rodadas de guerra
     statements.push({
       sql: `
         DELETE FROM war_days 
@@ -143,7 +142,6 @@ export default async function handler(req, res) {
     const { tag } = req.query;
     let clans = [];
 
-    // Aceita tag específica (?tag=%23XYZ) ou lê todos os clãs habilitados
     if (tag) {
       clans = [{ tag: decodeURIComponent(tag) }];
     } else {
