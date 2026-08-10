@@ -190,15 +190,9 @@
     font-size: 13px;
   }
 
-  .promo-section {
-    margin-bottom: 20px;
-  }
+  .promo-section { margin-bottom: 20px; }
   .promo-section:last-child { margin-bottom: 0; }
-  .promo-section h3 {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
+  .promo-section h3 { display: flex; align-items: center; gap: 12px; }
   .promo-section h3 .badge-count {
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
@@ -207,22 +201,11 @@
     border-radius: 999px;
     color: var(--text-muted);
   }
-  .promo-table-wrap {
-    overflow-x: auto;
-  }
-  .promo-table-wrap table {
-    font-size: 13px;
-  }
-  .promo-table-wrap table th {
-    font-size: 10px;
-    padding: 6px 10px;
-  }
-  .promo-table-wrap table td {
-    padding: 6px 10px;
-  }
-  .promo-table-wrap table td:first-child {
-    font-weight: 500;
-  }
+  .promo-table-wrap { overflow-x: auto; }
+  .promo-table-wrap table { font-size: 13px; }
+  .promo-table-wrap table th { font-size: 10px; padding: 6px 10px; }
+  .promo-table-wrap table td { padding: 6px 10px; }
+  .promo-table-wrap table td:first-child { font-weight: 500; }
   .promo-table-wrap table td.num-col {
     text-align: center;
     font-family: 'JetBrains Mono', monospace;
@@ -230,9 +213,7 @@
     color: var(--text-faint);
     width: 35px;
   }
-  .promo-badge-cell {
-    text-align: center;
-  }
+  .promo-badge-cell { text-align: center; }
   .badge {
     font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
@@ -246,17 +227,8 @@
   .badge.promote-elder { background: rgba(62,207,142,0.16); color: var(--success); border: 1px solid rgba(62,207,142,0.3); }
   .badge.promote-coleader { background: rgba(79,124,255,0.16); color: var(--blue); border: 1px solid rgba(79,124,255,0.3); }
 
-  .track-label { font-size: 11px; color: var(--text-faint); font-family: 'JetBrains Mono', monospace; margin-bottom: 6px; display: flex; justify-content: space-between; }
-  .track { height: 6px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
-  .track-fill { height: 100%; border-radius: 999px; background: var(--text-faint); }
-  .track-fill.ok { background: var(--gold); }
-
   .ref-note { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-faint); margin-top: 14px; }
-
-  .sort-indicator {
-    font-size: 10px;
-    margin-left: 4px;
-  }
+  .sort-indicator { font-size: 10px; margin-left: 4px; }
   .promo-rank {
     font-size: 10px;
     color: var(--text-faint);
@@ -270,12 +242,12 @@
 
   <header>
     <div>
-      <div class="eyebrow" id="clanLabel">Nenhum clã conectado</div>
+      <div class="eyebrow" id="clanLabel">Carregando Clã...</div>
       <h1>Clash Clan Tracker</h1>
     </div>
     <div class="status-pill">
       <span class="dot" id="statusDot"></span>
-      <span id="statusText">Sem conexão</span>
+      <span id="statusText">Conectando...</span>
     </div>
   </header>
 
@@ -283,10 +255,15 @@
     <h2>Conexão</h2>
     <div class="config-grid">
       <input id="apiUrl" readonly style="opacity: 0.6; cursor: not-allowed;" value="https://clash-tracker-six.vercel.app" />
-      <select id="clanSelect"><option value="">Selecione um clã</option></select>
-      <button onclick="connect()">Conectar</button>
+      <select id="clanSelect" onchange="loadClanData(this.value)">
+        <option value="LLJ8JQ99">Clã 1 (LLJ8JQ99)</option>
+        <option value="229G9V9Q">Clã 2 (229G9V9Q)</option>
+        <option value="QVQ9R80V">Clã 3 (QVQ9R80V)</option>
+        <option value="QGRRJLLG">Clã 4 (QGRRJLLG)</option>
+      </select>
+      <button onclick="connect()">Carregar Clã</button>
     </div>
-    <p class="hint">A URL da API já está fixa. Basta selecionar um clã e conectar.</p>
+    <p class="hint">Selecione qualquer um dos 4 clãs e clique em Carregar.</p>
   </div>
 
   <div class="panel">
@@ -318,9 +295,16 @@
 <script>
 const API_BASE_URL = 'https://clash-tracker-six.vercel.app';
 
+const KNOWN_CLANS = [
+  { tag: 'LLJ8JQ99', name: 'Clã LLJ8JQ99' },
+  { tag: '229G9V9Q', name: 'Clã 229G9V9Q' },
+  { tag: 'QVQ9R80V', name: 'Clã QVQ9R80V' },
+  { tag: 'QGRRJLLG', name: 'Clã QGRRJLLG' }
+];
+
 const state = {
   apiUrl: API_BASE_URL,
-  clanTag: '',
+  clanTag: 'LLJ8JQ99',
   warDays: [],
   promotions: [],
   sortMode: 'total',
@@ -350,34 +334,37 @@ function setStatus(connected, text) {
 }
 
 async function connect() {
-  setStatus(false, 'Conectando…');
+  const sel = document.getElementById('clanSelect');
+  const tag = sel.value || 'LLJ8JQ99';
+
   try {
-    const res = await fetch(API_BASE_URL + '/api/clans');
-    const clans = await res.json();
-    const sel = document.getElementById('clanSelect');
-    sel.innerHTML = '<option value="">Selecione um clã</option>' +
-      clans.map(c => `<option value="${c.tag || c.clan_tag}">${c.name || c.clan_name || c.tag}</option>`).join('');
-    
-    sel.onchange = () => loadClanData(sel.value);
-    
-    if (clans.length > 0) {
-      const defaultTag = clans[0].tag || clans[0].clan_tag;
-      sel.value = defaultTag;
-      loadClanData(defaultTag);
-    } else {
-      setStatus(false, 'Nenhum clã encontrado');
+    const res = await fetch(API_BASE_URL + '/api/clans').catch(() => null);
+    if (res && res.ok) {
+      const clans = await res.json();
+      if (Array.isArray(clans) && clans.length > 0) {
+        sel.innerHTML = clans.map(c => {
+          const cTag = (c.tag || c.clan_tag || '').replace('#', '');
+          const cName = c.name || c.clan_name || cTag;
+          return `<option value="${cTag}">${cName} (${cTag})</option>`;
+        }).join('');
+        if ([...sel.options].some(o => o.value === tag)) {
+          sel.value = tag;
+        }
+      }
     }
-  } catch (err) {
-    setStatus(false, 'Não foi possível conectar: ' + err.message);
+  } catch (e) {
+    console.log("Mantendo lista padrão de clãs.");
   }
+
+  loadClanData(sel.value || tag);
 }
 
 async function loadClanData(tag) {
-  if (!tag) return;
+  if (!tag) tag = 'LLJ8JQ99';
   state.clanTag = tag;
   const cleanTag = tag.replace('#', '');
-  document.getElementById('clanLabel').textContent = tag;
-  setStatus(true, 'Carregando dados…');
+  document.getElementById('clanLabel').textContent = '#' + cleanTag;
+  setStatus(true, 'Carregando ' + cleanTag + '...');
 
   try {
     const [wdRes, prRes] = await Promise.all([
@@ -385,25 +372,21 @@ async function loadClanData(tag) {
       fetch(`${API_BASE_URL}/api/promotions/${cleanTag}`).catch(() => null)
     ]);
 
-    state.warDays = wdRes && wdRes.ok ? await wdRes.json() : [];
-    state.promotions = prRes && prRes.ok ? await prRes.json() : [];
+    state.warDays = (wdRes && wdRes.ok) ? await wdRes.json() : [];
+    state.promotions = (prRes && prRes.ok) ? await prRes.json() : [];
 
-    setStatus(true, 'Conectado · ' + tag);
+    setStatus(true, 'Conectado · ' + cleanTag);
     render();
   } catch (err) {
-    setStatus(true, 'Conectado · ' + tag);
+    setStatus(true, 'Conectado · ' + cleanTag);
     render();
   }
 }
 
 function toggleSort(columnIndex) {
   const key = columnIndex === -1 ? 'name' : (columnIndex === -2 ? 'total' : `day-${columnIndex}`);
-  if (state.sortMode === key) {
-    state.sortAsc = !state.sortAsc;
-  } else {
-    state.sortMode = key;
-    state.sortAsc = false;
-  }
+  if (state.sortMode === key) state.sortAsc = !state.sortAsc;
+  else { state.sortMode = key; state.sortAsc = false; }
   render();
 }
 
@@ -414,19 +397,15 @@ function toggleHistory() {
 }
 
 function togglePromoSort(column) {
-  if (state.promoSortMode === column) {
-    state.promoSortAsc = !state.promoSortAsc;
-  } else {
-    state.promoSortMode = column;
-    state.promoSortAsc = false;
-  }
+  if (state.promoSortMode === column) state.promoSortAsc = !state.promoSortAsc;
+  else { state.promoSortMode = column; state.promoSortAsc = false; }
   renderPromotions();
 }
 
 function renderAttackTable() {
   const wrap = document.getElementById('attackTableWrap');
   if (!state.warDays || !state.warDays.length) {
-    wrap.innerHTML = '<div class="empty-state">Nenhum dado de ataque encontrado.</div>';
+    wrap.innerHTML = '<div class="empty-state">Nenhum dado de ataque encontrado para este clã.</div>';
     return;
   }
 
@@ -551,7 +530,7 @@ function renderPromotions() {
   if (!list.length) {
     elderSection.innerHTML = '';
     coLeaderSection.innerHTML = '';
-    fullTableWrap.innerHTML = '<div class="empty-state">Sem dados para calcular promoções.</div>';
+    fullTableWrap.innerHTML = '<div class="empty-state">Sem dados de promoção para este clã.</div>';
     ref.textContent = '';
     return;
   }
