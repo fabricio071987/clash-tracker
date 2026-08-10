@@ -190,15 +190,9 @@
     font-size: 13px;
   }
 
-  .promo-section {
-    margin-bottom: 20px;
-  }
+  .promo-section { margin-bottom: 20px; }
   .promo-section:last-child { margin-bottom: 0; }
-  .promo-section h3 {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
+  .promo-section h3 { display: flex; align-items: center; gap: 12px; }
   .promo-section h3 .badge-count {
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
@@ -207,22 +201,11 @@
     border-radius: 999px;
     color: var(--text-muted);
   }
-  .promo-table-wrap {
-    overflow-x: auto;
-  }
-  .promo-table-wrap table {
-    font-size: 13px;
-  }
-  .promo-table-wrap table th {
-    font-size: 10px;
-    padding: 6px 10px;
-  }
-  .promo-table-wrap table td {
-    padding: 6px 10px;
-  }
-  .promo-table-wrap table td:first-child {
-    font-weight: 500;
-  }
+  .promo-table-wrap { overflow-x: auto; }
+  .promo-table-wrap table { font-size: 13px; }
+  .promo-table-wrap table th { font-size: 10px; padding: 6px 10px; }
+  .promo-table-wrap table td { padding: 6px 10px; }
+  .promo-table-wrap table td:first-child { font-weight: 500; }
   .promo-table-wrap table td.num-col {
     text-align: center;
     font-family: 'JetBrains Mono', monospace;
@@ -230,9 +213,7 @@
     color: var(--text-faint);
     width: 35px;
   }
-  .promo-badge-cell {
-    text-align: center;
-  }
+  .promo-badge-cell { text-align: center; }
   .badge {
     font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
@@ -246,23 +227,9 @@
   .badge.promote-elder { background: rgba(62,207,142,0.16); color: var(--success); border: 1px solid rgba(62,207,142,0.3); }
   .badge.promote-coleader { background: rgba(79,124,255,0.16); color: var(--blue); border: 1px solid rgba(79,124,255,0.3); }
 
-  .track-label { font-size: 11px; color: var(--text-faint); font-family: 'JetBrains Mono', monospace; margin-bottom: 6px; display: flex; justify-content: space-between; }
-  .track { height: 6px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
-  .track-fill { height: 100%; border-radius: 999px; background: var(--text-faint); }
-  .track-fill.ok { background: var(--gold); }
-
   .ref-note { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-faint); margin-top: 14px; }
-
-  .sort-indicator {
-    font-size: 10px;
-    margin-left: 4px;
-  }
-  .promo-rank {
-    font-size: 10px;
-    color: var(--text-faint);
-    font-family: 'JetBrains Mono', monospace;
-    text-transform: uppercase;
-  }
+  .sort-indicator { font-size: 10px; margin-left: 4px; }
+  .promo-rank { font-size: 10px; color: var(--text-faint); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; }
 </style>
 </head>
 <body>
@@ -282,11 +249,11 @@
   <div class="panel">
     <h2>Conexão</h2>
     <div class="config-grid">
-      <input id="apiUrl" placeholder="https://clash-tracker-six.vercel.app" value="https://clash-tracker-six.vercel.app" />
+      <input id="apiUrl" placeholder="https://api.seu-projeto.vercel.app" />
       <select id="clanSelect"><option value="">Selecione um clã</option></select>
       <button onclick="connect()">Conectar</button>
     </div>
-    <p class="hint">Digite a URL da sua API Vercel. A página conecta sozinha ao abrir.</p>
+    <p class="hint">Digite a URL da sua API Vercel. A página reconecta automaticamente na abertura.</p>
   </div>
 
   <div class="panel">
@@ -316,10 +283,6 @@
 </div>
 
 <script>
-// ============================================================
-// CLASH CLAN TRACKER - FRONTEND PARA GITHUB PAGES
-// ============================================================
-
 const state = {
   apiUrl: '',
   clanTag: '',
@@ -333,8 +296,7 @@ const state = {
   promoSortAsc: false,
 };
 
-function shieldSVG(used, total, size) {
-  size = size || 34;
+function shieldSVG(used, total, size = 34) {
   const pct = total > 0 ? used / total : 0;
   let color = 'var(--danger)';
   if (pct >= 1) color = 'var(--gold)';
@@ -357,22 +319,29 @@ function setStatus(connected, text) {
 async function connect() {
   const url = document.getElementById('apiUrl').value.trim().replace(/\/$/, '');
   if (!url) { alert('Digite a URL da sua API primeiro.'); return; }
+  
+  localStorage.setItem('clash_api_url', url);
   state.apiUrl = url;
   setStatus(false, 'Conectando…');
+
   try {
     const res = await fetch(url + '/api/clans');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const clans = await res.json();
+    
     const sel = document.getElementById('clanSelect');
     sel.innerHTML = '<option value="">Selecione um clã</option>' +
       clans.map(c => `<option value="${c.tag}">${c.name || c.tag}</option>`).join('');
     sel.onchange = () => loadClanData(sel.value);
+    
     setStatus(clans.length > 0, clans.length > 0 ? clans.length + ' clã(s) encontrado(s)' : 'Nenhum clã cadastrado ainda');
+    
     if (clans.length > 0) {
       sel.value = clans[0].tag;
       loadClanData(clans[0].tag);
     }
   } catch (err) {
-    setStatus(false, 'Não foi possível conectar: ' + err.message);
+    setStatus(false, 'Erro de conexão: ' + err.message);
   }
 }
 
@@ -381,21 +350,12 @@ async function loadClanData(tag) {
   state.clanTag = tag;
   document.getElementById('clanLabel').textContent = tag;
   setStatus(true, 'Carregando dados…');
+
   try {
-    // --- CORREÇÃO: Adicionado Timeout de 8 segundos para não travar o navegador ---
-    const controller1 = new AbortController();
-    const controller2 = new AbortController();
-    const timeout1 = setTimeout(() => controller1.abort(), 8000);
-    const timeout2 = setTimeout(() => controller2.abort(), 8000);
-
     const [wd, pr] = await Promise.all([
-      fetch(state.apiUrl + '/api/war-days/' + encodeURIComponent(tag), { signal: controller1.signal }).then(r => r.json()),
-      fetch(state.apiUrl + '/api/promotions/' + encodeURIComponent(tag), { signal: controller2.signal }).then(r => r.json()),
+      fetch(state.apiUrl + '/api/war-days/' + encodeURIComponent(tag)).then(r => r.json()),
+      fetch(state.apiUrl + '/api/promotions/' + encodeURIComponent(tag)).then(r => r.json()),
     ]);
-
-    clearTimeout(timeout1);
-    clearTimeout(timeout2);
-
     state.warDays = wd;
     state.promotions = pr;
     
@@ -409,21 +369,8 @@ async function loadClanData(tag) {
     setStatus(true, 'Conectado · ' + tag);
     render();
   } catch (err) {
-    console.warn("Erro ao carregar dados (ou timeout):", err.message);
-    setStatus(true, 'Conectado (Aguardando dados...)');
-    // Mostra tabelas vazias para o usuário não ficar preso na tela de carregamento
-    renderEmpty();
+    setStatus(false, 'Erro ao carregar dados do clã');
   }
-}
-
-// Função para renderizar estado vazio (Quando o banco está demorando ou vazio)
-function renderEmpty() {
-  const wrap = document.getElementById('attackTableWrap');
-  wrap.innerHTML = '<div class="empty-state">⏳ Aguardando o banco de dados coletar os primeiros ataques... (Pode levar alguns minutos)</div>';
-  document.getElementById('promoElderSection').innerHTML = '';
-  document.getElementById('promoCoLeaderSection').innerHTML = '';
-  document.getElementById('promoFullTableWrap').innerHTML = '<div class="empty-state">⏳ Aguardando os dados de promoções...</div>';
-  document.getElementById('promoRef').textContent = '';
 }
 
 function toggleSort(columnIndex) {
@@ -552,7 +499,7 @@ function renderAttackTable() {
         <div class="member-name">${m.name}</div>
         <div class="member-total">${m.total}/${m.maxTotal} ataques</div>
       </td>
-      ${days.map((d, idx) => {
+      ${days.map((d) => {
         const r = m.byPeriod[d.period];
         const used = r ? r.decks_used : null;
         if (used === null) return '<td class="shield-cell"><span style="color:var(--text-faint);font-size:11px">—</span></td>';
@@ -573,7 +520,7 @@ function renderPromotions() {
   if (!state.promotions.length) {
     elderSection.innerHTML = '';
     coLeaderSection.innerHTML = '';
-    fullTableWrap.innerHTML = '<div class="empty-state">Nenhum cálculo de promoção ainda. Ele roda toda segunda de manhã, após o fechamento da guerra.</div>';
+    fullTableWrap.innerHTML = '<div class="empty-state">Nenhum cálculo de promoção ainda.</div>';
     ref.textContent = '';
     return;
   }
@@ -759,8 +706,19 @@ function render() {
   renderPromotions();
 }
 
-// ---- Inicialização ----
-connect();
+// Inicialização Inteligente com Suporte Autoconect
+window.addEventListener('DOMContentLoaded', () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const apiParam = urlParams.get('api');
+  const savedUrl = localStorage.getItem('clash_api_url');
+  
+  const initialUrl = apiParam || savedUrl || 'https://api.seu-projeto.vercel.app';
+  document.getElementById('apiUrl').value = initialUrl;
+  
+  if (apiParam || savedUrl) {
+    connect();
+  }
+});
 </script>
 </body>
 </html>
