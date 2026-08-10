@@ -282,11 +282,11 @@
   <div class="panel">
     <h2>Conexão</h2>
     <div class="config-grid">
-      <input id="apiUrl" placeholder="https://clash-tracker-six.vercel.app" value="https://clash-tracker-six.vercel.app" />
+      <input id="apiUrl" readonly style="opacity: 0.6; cursor: not-allowed;" value="https://clash-tracker-six.vercel.app" />
       <select id="clanSelect"><option value="">Selecione um clã</option></select>
       <button onclick="connect()">Conectar</button>
     </div>
-    <p class="hint">Digite a URL da sua API Vercel. A página conecta sozinha ao abrir.</p>
+    <p class="hint">A URL da API já está fixa. Basta selecionar um clã e conectar.</p>
   </div>
 
   <div class="panel">
@@ -320,8 +320,11 @@
 // CLASH CLAN TRACKER - FRONTEND PARA GITHUB PAGES
 // ============================================================
 
+// DEFINIÇÃO FIXA DA API DA VERCEL
+const API_BASE_URL = 'https://clash-tracker-six.vercel.app';
+
 const state = {
-  apiUrl: '',
+  apiUrl: API_BASE_URL,
   clanTag: '',
   warDays: [],
   promotions: [],
@@ -355,12 +358,12 @@ function setStatus(connected, text) {
 }
 
 async function connect() {
-  const url = document.getElementById('apiUrl').value.trim().replace(/\/$/, '');
-  if (!url) { alert('Digite a URL da sua API primeiro.'); return; }
-  state.apiUrl = url;
+  // Não precisamos mais pegar a URL do input, ela é fixa!
+  state.apiUrl = API_BASE_URL;
+  
   setStatus(false, 'Conectando…');
   try {
-    const res = await fetch(url + '/api/clans');
+    const res = await fetch(API_BASE_URL + '/api/clans');
     const clans = await res.json();
     const sel = document.getElementById('clanSelect');
     sel.innerHTML = '<option value="">Selecione um clã</option>' +
@@ -382,11 +385,11 @@ async function loadClanData(tag) {
   document.getElementById('clanLabel').textContent = tag;
   setStatus(true, 'Carregando dados…');
   try {
-    // --- CORREÇÃO: Adicionado Timeout de 8 segundos para não travar o navegador ---
+    // Timeout de 5 segundos para não travar o navegador
     const controller1 = new AbortController();
     const controller2 = new AbortController();
-    const timeout1 = setTimeout(() => controller1.abort(), 8000);
-    const timeout2 = setTimeout(() => controller2.abort(), 8000);
+    const timeout1 = setTimeout(() => controller1.abort(), 5000);
+    const timeout2 = setTimeout(() => controller2.abort(), 5000);
 
     const [wd, pr] = await Promise.all([
       fetch(state.apiUrl + '/api/war-days/' + encodeURIComponent(tag), { signal: controller1.signal }).then(r => r.json()),
@@ -411,15 +414,13 @@ async function loadClanData(tag) {
   } catch (err) {
     console.warn("Erro ao carregar dados (ou timeout):", err.message);
     setStatus(true, 'Conectado (Aguardando dados...)');
-    // Mostra tabelas vazias para o usuário não ficar preso na tela de carregamento
     renderEmpty();
   }
 }
 
-// Função para renderizar estado vazio (Quando o banco está demorando ou vazio)
 function renderEmpty() {
   const wrap = document.getElementById('attackTableWrap');
-  wrap.innerHTML = '<div class="empty-state">⏳ Aguardando o banco de dados coletar os primeiros ataques... (Pode levar alguns minutos)</div>';
+  wrap.innerHTML = '<div class="empty-state">⏳ Aguardando o banco de dados coletar os primeiros ataques...</div>';
   document.getElementById('promoElderSection').innerHTML = '';
   document.getElementById('promoCoLeaderSection').innerHTML = '';
   document.getElementById('promoFullTableWrap').innerHTML = '<div class="empty-state">⏳ Aguardando os dados de promoções...</div>';
@@ -760,7 +761,10 @@ function render() {
 }
 
 // ---- Inicialização ----
-connect();
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("Iniciando aplicação...");
+    connect();
+});
 </script>
 </body>
 </html>
