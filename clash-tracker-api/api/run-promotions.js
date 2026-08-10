@@ -5,12 +5,10 @@ const turso = createClient({
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
-// Usa a variável de ambiente ou o IP padrão
 const ROYALE_API_BASE = process.env.ROYALE_API_BASE || 'http://45.79.218.79/v1';
 
 async function callRoyaleAPI(path) {
   const token = process.env.ROYALE_API_TOKEN;
-  
   console.log(`[API] Chamando: ${path}`);
   console.log(`[API] Token: ${token ? 'Presente' : 'AUSENTE'}`);
   console.log(`[API] Base URL: ${ROYALE_API_BASE}`);
@@ -48,6 +46,18 @@ async function callRoyaleAPIWithRetry(path, retries = 2) {
 
 function encodeTag(tag) {
   return encodeURIComponent(tag);
+}
+
+// Função para salvar no banco com timeout (Não trava o site se o banco demorar)
+async function saveToTurso(sql, args) {
+  try {
+    await Promise.race([
+      turso.execute({ sql, args }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Turso (5s)')), 5000))
+    ]);
+  } catch (err) {
+    console.log(`[AVISO] Falha ao salvar no Turso (pulado): ${err.message}`);
+  }
 }
 
 async function calculatePromotions(clan) {
@@ -99,59 +109,50 @@ async function calculatePromotions(clan) {
       const avg4 = sum4 / 4;
       const avg8 = sum8 / 8;
 
-      console.log(`[PROMO] ${memberInfo?.name}: avg4=${avg4.toFixed(0)}, avg8=${avg8.toFixed(0)}`);
-
-      await turso.execute({
-        sql: `
-          INSERT INTO promotions
-            (clan_tag, member_tag, member_name, member_rank,
-             reference_section_index,
-             sum_4w, avg_4w, eligible_elder, 
-             sum_8w, avg_8w, eligible_colider, 
-             calculated_at, is_active)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(clan_tag, member_tag, calculated_at) DO UPDATE SET
-            member_name = excluded.member_name,
-            member_rank = excluded.member_rank,
-            sum_4w = excluded.sum_4w,
-            avg_4w = excluded.avg_4w,
-            eligible_elder = excluded.eligible_elder,
-            sum_8w = excluded.sum_8w,
-            avg_8w = excluded.avg_8w,
-            eligible_colider = excluded.eligible_colider,
-            is_active = excluded.is_active
-        `,
-        args: [
-          clan.tag,
-          memberTag,
-          memberInfo?.name || '',
-          memberInfo?.rank || 'member',
-          referenceSectionIndex,
-          sum4,
-          avg4,
-          avg4 >= 2500 ? 1 : 0,
-          sum8,
-          avg8,
-          avg8 >= 2500 ? 1 : 0,
-          now,
-          1
-        ]
-      });
+      await saveToTurso(`
+        INSERT INTO promotions
+          (clan_tag, member_tag, member_name, member_rank,
+           reference_section_index,
+           sum_4w, avg_4w, eligible_elder, 
+           sum_8w, avg_8w, eligible_colider, 
+           calculated_at, is_active)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(clan_tag, member_tag, calculated_at) DO UPDATE SET
+          member_name = excluded.member_name,
+          member_rank = excluded.member_rank,
+          sum_4w = excluded.sum_4w,
+          avg_4w = excluded.avg_4w,
+          eligible_elder = excluded.eligible_elder,
+          sum_8w = excluded.sum_8w,
+          avg_8w = excluded.avg_8w,
+          eligible_colider = excluded.eligible_colider,
+          is_active = excluded.is_active
+      `, [
+        clan.tag,
+        memberTag,
+        memberInfo?.name || '',
+        memberInfo?.rank || 'member',
+        referenceSectionIndex,
+        sum4,
+        avg4,
+        avg4 >= 2500 ? 1 : 0,
+        sum8,
+        avg8,
+        avg8 >= 2500 ? 1 : 0,
+        now,
+        1
+      ]);
       savedCount++;
     }
 
     console.log(`[PROMO] ${savedCount} promoções salvas para ${clan.tag}`);
 
-    // Marca inativos
     const allMemberTags = Array.from(memberMap.keys());
     if (allMemberTags.length > 0) {
       const placeholders = allMemberTags.map(() => '?').join(',');
-      await turso.execute({
-        sql: `UPDATE promotions SET is_active = 0 
-              WHERE clan_tag = ? AND calculated_at = ? 
-              AND member_tag NOT IN (${placeholders})`,
-        args: [clan.tag, now, ...allMemberTags]
-      });
+      await saveToTurso(`UPDATE promotions SET is_active = 0 
+            WHERE clan_tag = ? AND calculated_at = ? 
+            AND member_tag NOT IN (${placeholders})`, [clan.tag, now, ...allMemberTags]);
     }
 
   } catch (err) {
@@ -161,31 +162,17 @@ async function calculatePromotions(clan) {
 }
 
 export default async function handler(req, res) {
-  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // --- CORREÇÃO DO TIMEOUT DA VERCEL ---
-  // 1. Já manda a resposta imediata (Vercel para de contar o tempo)
-  res.status(200).json({ 
-    success: true, 
-    message: 'Cálculo de promoções iniciado em background!',
-    timestamp: new Date().toISOString()
-  });
+  // Resposta imediata para não travar o cron
+  res.status(200).json({ success: true, message: 'Processando em background...' });
 
-  // 2. Processamento pesado roda em segundo plano (setTimeout 0)
   setTimeout(async () => {
     try {
       console.log('[CRON] Iniciando cálculo de promoções em background...');
-      
-      const clans = await turso.execute(
-        'SELECT tag, name FROM clans WHERE enabled = 1'
-      );
-
+      const clans = await turso.execute('SELECT tag, name FROM clans WHERE enabled = 1');
       console.log(`[CRON] ${clans.rows.length} clã(s) encontrado(s)`);
 
       for (const clan of clans.rows) {
@@ -195,12 +182,9 @@ export default async function handler(req, res) {
           console.error(`Erro no clã ${clan.tag}:`, err.message);
         }
       }
-
       console.log('[CRON] Cálculo de promoções finalizado.');
-      
     } catch (error) {
-      console.error('Erro no processamento em background:', error);
+      console.error('Erro no background:', error);
     }
   }, 0);
-  // ------------------------------------
 }
