@@ -2,6 +2,10 @@
   "name": "clash-tracker-api",
   "version": "1.0.0",
   "description": "API para Clash Clan Tracker",
+  "type": "module",
+  "engines": {
+    "node": "18.x"
+  },
   "dependencies": {
     "@libsql/client": "^0.3.0"
   }
