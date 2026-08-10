@@ -7,7 +7,7 @@ const turso = createClient({
 
 const ROYALE_API_BASE = process.env.ROYALE_API_BASE || 'http://45.79.218.79/v1';
 
-async function callRoyaleAPI(path) {
+async function callRoyaleAPI(path ) {
   const token = process.env.ROYALE_API_TOKEN;
   console.log(`[API] Chamando: ${path}`);
   console.log(`[API] Token: ${token ? 'Presente' : 'AUSENTE'}`);
@@ -48,7 +48,6 @@ function encodeTag(tag) {
   return encodeURIComponent(tag);
 }
 
-// Função para salvar no banco com timeout (Não trava o site se o banco demorar)
 async function saveToTurso(sql, args) {
   try {
     await Promise.race([
@@ -56,7 +55,8 @@ async function saveToTurso(sql, args) {
       new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Turso (5s)')), 5000))
     ]);
   } catch (err) {
-    console.log(`[AVISO] Falha ao salvar no Turso (pulado): ${err.message}`);
+    console.log(`[AVISO] Falha ao salvar no Turso: ${err.message}`);
+    throw err;
   }
 }
 
@@ -72,10 +72,10 @@ async function collectClanAttacks(clan) {
     });
 
     const race = await callRoyaleAPIWithRetry(`/clans/${encodeTag(clan.tag)}/currentriverrace`);
-
+    
     if (race.periodType !== 'warDay') {
       console.log(`[${clan.tag}] Não é dia de guerra. Pulando.`);
-      return;
+      return { clan: clan.tag, status: 'skipped_not_warday' };
     }
 
     const sectionIndex = race.sectionIndex;
@@ -85,7 +85,7 @@ async function collectClanAttacks(clan) {
 
     if (participants.length === 0) {
       console.log(`[${clan.tag}] Nenhum participante encontrado.`);
-      return;
+      return { clan: clan.tag, status: 'no_participants' };
     }
 
     let savedCount = 0;
@@ -139,6 +139,7 @@ async function collectClanAttacks(clan) {
     `, [clan.tag, clan.tag]);
 
     console.log(`[${clan.tag}] Coleta finalizada.`);
+    return { clan: clan.tag, status: 'success', saved: savedCount };
   } catch (err) {
     console.error(`[${clan.tag}] Erro na coleta:`, err.message);
     throw err;
@@ -150,25 +151,26 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // Resposta imediata para não travar o cron
-  res.status(200).json({ success: true, message: 'Processando em background...' });
+  try {
+    console.log('[CRON] Iniciando coleta de ataques síncrona...');
+    const clansResult = await turso.execute('SELECT tag, name FROM clans WHERE enabled = 1');
+    const clans = clansResult.rows;
+    console.log(`[CRON] ${clans.length} clã(s) habilitado(s) encontrado(s)`);
 
-  setTimeout(async () => {
-    try {
-      console.log('[CRON] Iniciando coleta de ataques em background...');
-      const clans = await turso.execute('SELECT tag, name FROM clans WHERE enabled = 1');
-      console.log(`[CRON] ${clans.rows.length} clã(s) encontrado(s)`);
-
-      for (const clan of clans.rows) {
-        try {
-          await collectClanAttacks(clan);
-        } catch (err) {
-          console.error(`Erro no clã ${clan.tag}:`, err.message);
-        }
+    const results = [];
+    for (const clan of clans) {
+      try {
+        const resCol = await collectClanAttacks(clan);
+        results.push(resCol);
+      } catch (err) {
+        console.error(`Erro no clã ${clan.tag}:`, err.message);
+        results.push({ clan: clan.tag, error: err.message });
       }
-      console.log('[CRON] Coleta de ataques finalizada.');
-    } catch (error) {
-      console.error('Erro no background:', error);
     }
-  }, 0);
+
+    return res.status(200).json({ success: true, results });
+  } catch (error) {
+    console.error('Erro fatal na execução:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
 }
