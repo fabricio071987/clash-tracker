@@ -5,12 +5,10 @@ const turso = createClient({
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
-// Usa a variável de ambiente ou o IP padrão
 const ROYALE_API_BASE = process.env.ROYALE_API_BASE || 'http://45.79.218.79/v1';
 
 async function callRoyaleAPI(path) {
   const token = process.env.ROYALE_API_TOKEN;
-  
   console.log(`[API] Chamando: ${path}`);
   console.log(`[API] Token: ${token ? 'Presente' : 'AUSENTE'}`);
   console.log(`[API] Base URL: ${ROYALE_API_BASE}`);
@@ -50,6 +48,18 @@ function encodeTag(tag) {
   return encodeURIComponent(tag);
 }
 
+// Função para salvar no banco com timeout (Não trava o site se o banco demorar)
+async function saveToTurso(sql, args) {
+  try {
+    await Promise.race([
+      turso.execute({ sql, args }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Turso (5s)')), 5000))
+    ]);
+  } catch (err) {
+    console.log(`[AVISO] Falha ao salvar no Turso (pulado): ${err.message}`);
+  }
+}
+
 async function collectClanAttacks(clan) {
   console.log(`[ATTACKS] Coletando dados do clã ${clan.tag}`);
   
@@ -84,60 +94,49 @@ async function collectClanAttacks(clan) {
       if (!memberMap.has(p.tag)) continue;
       const memberInfo = memberMap.get(p.tag);
       
-      await turso.execute({
-        sql: `
-          INSERT INTO war_days
-            (clan_tag, section_index, period_index, member_tag, member_name, 
-             member_rank, decks_used, decks_total, updated_at, is_active)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(clan_tag, period_index, member_tag) DO UPDATE SET
-            member_name = excluded.member_name,
-            member_rank = excluded.member_rank,
-            decks_used = excluded.decks_used,
-            updated_at = excluded.updated_at,
-            is_active = excluded.is_active
-        `,
-        args: [
-          clan.tag,
-          sectionIndex,
-          periodIndex,
-          p.tag,
-          memberInfo?.name || p.name,
-          memberInfo?.rank || 'member',
-          p.decksUsedToday ?? 0,
-          4,
-          now,
-          1
-        ]
-      });
+      await saveToTurso(`
+        INSERT INTO war_days
+          (clan_tag, section_index, period_index, member_tag, member_name, 
+           member_rank, decks_used, decks_total, updated_at, is_active)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(clan_tag, period_index, member_tag) DO UPDATE SET
+          member_name = excluded.member_name,
+          member_rank = excluded.member_rank,
+          decks_used = excluded.decks_used,
+          updated_at = excluded.updated_at,
+          is_active = excluded.is_active
+      `, [
+        clan.tag,
+        sectionIndex,
+        periodIndex,
+        p.tag,
+        memberInfo?.name || p.name,
+        memberInfo?.rank || 'member',
+        p.decksUsedToday ?? 0,
+        4,
+        now,
+        1
+      ]);
       savedCount++;
     }
 
     console.log(`[${clan.tag}] ${savedCount} membros salvos.`);
 
-    // Marca inativos
     const currentMemberTags = Array.from(memberMap.keys());
     if (currentMemberTags.length > 0) {
       const placeholders = currentMemberTags.map(() => '?').join(',');
-      await turso.execute({
-        sql: `UPDATE war_days SET is_active = 0 
-              WHERE clan_tag = ? AND member_tag NOT IN (${placeholders})`,
-        args: [clan.tag, ...currentMemberTags]
-      });
+      await saveToTurso(`UPDATE war_days SET is_active = 0 
+            WHERE clan_tag = ? AND member_tag NOT IN (${placeholders})`, [clan.tag, ...currentMemberTags]);
     }
 
-    // Mantém 20 dias
-    await turso.execute({
-      sql: `
-        DELETE FROM war_days
-        WHERE clan_tag = ? AND period_index NOT IN (
-          SELECT period_index FROM war_days
-          WHERE clan_tag = ? GROUP BY period_index
-          ORDER BY period_index DESC LIMIT 20
-        )
-      `,
-      args: [clan.tag, clan.tag]
-    });
+    await saveToTurso(`
+      DELETE FROM war_days
+      WHERE clan_tag = ? AND period_index NOT IN (
+        SELECT period_index FROM war_days
+        WHERE clan_tag = ? GROUP BY period_index
+        ORDER BY period_index DESC LIMIT 20
+      )
+    `, [clan.tag, clan.tag]);
 
     console.log(`[${clan.tag}] Coleta finalizada.`);
   } catch (err) {
@@ -147,31 +146,17 @@ async function collectClanAttacks(clan) {
 }
 
 export default async function handler(req, res) {
-  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // --- CORREÇÃO DO TIMEOUT DA VERCEL ---
-  // 1. Já manda a resposta imediata para o cron-job.org (para a Vercel parar de contar o tempo)
-  res.status(200).json({ 
-    success: true, 
-    message: 'Coleta de ataques iniciada em background!',
-    timestamp: new Date().toISOString()
-  });
+  // Resposta imediata para não travar o cron
+  res.status(200).json({ success: true, message: 'Processando em background...' });
 
-  // 2. O processamento pesado roda em segundo plano (setTimeout 0)
   setTimeout(async () => {
     try {
-      console.log('[CRON] Iniciando coleta de ataques...');
-      
-      const clans = await turso.execute(
-        'SELECT tag, name FROM clans WHERE enabled = 1'
-      );
-
+      console.log('[CRON] Iniciando coleta de ataques em background...');
+      const clans = await turso.execute('SELECT tag, name FROM clans WHERE enabled = 1');
       console.log(`[CRON] ${clans.rows.length} clã(s) encontrado(s)`);
 
       for (const clan of clans.rows) {
@@ -181,12 +166,9 @@ export default async function handler(req, res) {
           console.error(`Erro no clã ${clan.tag}:`, err.message);
         }
       }
-
       console.log('[CRON] Coleta de ataques finalizada.');
-      
     } catch (error) {
-      console.error('Erro no processamento em background:', error);
+      console.error('Erro no background:', error);
     }
   }, 0);
-  // ------------------------------------
 }
