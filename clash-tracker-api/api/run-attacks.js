@@ -9,10 +9,6 @@ const ROYALE_API_BASE = process.env.ROYALE_API_BASE || 'http://45.79.218.79/v1';
 
 async function callRoyaleAPI(path ) {
   const token = process.env.ROYALE_API_TOKEN;
-  console.log(`[API] Chamando: ${path}`);
-  console.log(`[API] Token: ${token ? 'Presente' : 'AUSENTE'}`);
-  console.log(`[API] Base URL: ${ROYALE_API_BASE}`);
-  
   const res = await fetch(`${ROYALE_API_BASE}${path}`, {
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -22,7 +18,6 @@ async function callRoyaleAPI(path ) {
   
   if (!res.ok) {
     const errorText = await res.text();
-    console.error(`[API] Erro ${res.status}: ${errorText}`);
     throw new Error(`RoyaleAPI ${path} -> HTTP ${res.status} - ${errorText}`);
   }
   return res.json();
@@ -35,7 +30,6 @@ async function callRoyaleAPIWithRetry(path, retries = 2) {
       return await callRoyaleAPI(path);
     } catch (err) {
       lastErr = err;
-      console.log(`[API] Tentativa ${attempt + 1} falhou: ${err.message}`);
       if (attempt < retries) {
         await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
       }
@@ -49,15 +43,10 @@ function encodeTag(tag) {
 }
 
 async function saveToTurso(sql, args) {
-  try {
-    await Promise.race([
-      turso.execute({ sql, args }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Turso (5s)')), 5000))
-    ]);
-  } catch (err) {
-    console.log(`[AVISO] Falha ao salvar no Turso: ${err.message}`);
-    throw err;
-  }
+  await Promise.race([
+    turso.execute({ sql, args }),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Turso (5s)')), 5000))
+  ]);
 }
 
 async function collectClanAttacks(clan) {
@@ -94,6 +83,7 @@ async function collectClanAttacks(clan) {
       if (!memberMap.has(p.tag)) continue;
       const memberInfo = memberMap.get(p.tag);
       
+      // Salva ou atualiza os ataques do membro na guerra atual
       await saveToTurso(`
         INSERT INTO war_days
           (clan_tag, section_index, period_index, member_tag, member_name, 
@@ -120,25 +110,6 @@ async function collectClanAttacks(clan) {
       savedCount++;
     }
 
-    console.log(`[${clan.tag}] ${savedCount} membros salvos.`);
-
-    const currentMemberTags = Array.from(memberMap.keys());
-    if (currentMemberTags.length > 0) {
-      const placeholders = currentMemberTags.map(() => '?').join(',');
-      await saveToTurso(`UPDATE war_days SET is_active = 0 
-            WHERE clan_tag = ? AND member_tag NOT IN (${placeholders})`, [clan.tag, ...currentMemberTags]);
-    }
-
-    await saveToTurso(`
-      DELETE FROM war_days
-      WHERE clan_tag = ? AND period_index NOT IN (
-        SELECT period_index FROM war_days
-        WHERE clan_tag = ? GROUP BY period_index
-        ORDER BY period_index DESC LIMIT 20
-      )
-    `, [clan.tag, clan.tag]);
-
-    console.log(`[${clan.tag}] Coleta finalizada.`);
     return { clan: clan.tag, status: 'success', saved: savedCount };
   } catch (err) {
     console.error(`[${clan.tag}] Erro na coleta:`, err.message);
@@ -152,10 +123,8 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    console.log('[CRON] Iniciando coleta de ataques síncrona...');
     const clansResult = await turso.execute('SELECT tag, name FROM clans WHERE enabled = 1');
     const clans = clansResult.rows;
-    console.log(`[CRON] ${clans.length} clã(s) habilitado(s) encontrado(s)`);
 
     const results = [];
     for (const clan of clans) {
@@ -163,14 +132,12 @@ export default async function handler(req, res) {
         const resCol = await collectClanAttacks(clan);
         results.push(resCol);
       } catch (err) {
-        console.error(`Erro no clã ${clan.tag}:`, err.message);
         results.push({ clan: clan.tag, error: err.message });
       }
     }
 
     return res.status(200).json({ success: true, results });
   } catch (error) {
-    console.error('Erro fatal na execução:', error);
     return res.status(500).json({ success: false, error: error.message });
   }
 }
