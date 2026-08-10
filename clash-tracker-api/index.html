@@ -90,23 +90,15 @@
     margin-bottom: 20px;
   }
 
-  .config-grid {
-    display: grid;
-    grid-template-columns: 2fr 1fr auto;
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
     gap: 10px;
-    margin-top: 12px;
   }
-  input, select {
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 8px;
-    padding: 10px 12px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
-    width: 100%;
-  }
-  input::placeholder { color: var(--text-faint); }
+  .toolbar-actions { display: flex; gap: 8px; }
   button {
     background: var(--gold);
     color: #241C08;
@@ -126,17 +118,6 @@
     color: var(--text-muted);
     border: 1px solid var(--border);
   }
-
-  .toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 16px;
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-  .toolbar-actions { display: flex; gap: 8px; }
-  .toolbar-actions button { padding: 8px 14px; font-size: 12px; }
 
   .table-scroll { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; min-width: 600px; }
@@ -216,23 +197,14 @@
 
   <header>
     <div>
-      <div class="eyebrow" id="clanLabel">Nenhum clã conectado</div>
+      <div class="eyebrow" id="clanLabel">Carregando Clã...</div>
       <h1>Clash Clan Tracker</h1>
     </div>
     <div class="status-pill">
       <span class="dot" id="statusDot"></span>
-      <span id="statusText">Sem conexão</span>
+      <span id="statusText">Conectando...</span>
     </div>
   </header>
-
-  <div class="panel">
-    <h2>Conexão</h2>
-    <div class="config-grid">
-      <input id="apiUrl" placeholder="https://api.seu-projeto.vercel.app" />
-      <select id="clanSelect"><option value="">Selecione um clã</option></select>
-      <button onclick="connect()">Conectar</button>
-    </div>
-  </div>
 
   <div class="panel">
     <div class="toolbar">
@@ -261,8 +233,10 @@
 </div>
 
 <script>
+const DEFAULT_API_URL = 'https://clash-tracker-six.vercel.app';
+
 const state = {
-  apiUrl: '',
+  apiUrl: DEFAULT_API_URL,
   clanTag: '',
   warDays: [],
   promotions: [],
@@ -290,29 +264,21 @@ function setStatus(connected, text) {
   document.getElementById('statusText').textContent = text;
 }
 
-async function connect() {
-  const url = document.getElementById('apiUrl').value.trim().replace(/\/$/, '');
-  if (!url) return alert('Digite a URL da sua API.');
-  
-  localStorage.setItem('clash_api_url', url);
-  state.apiUrl = url;
-  setStatus(false, 'Conectando…');
+async function initConnection() {
+  setStatus(false, 'Conectando à API...');
 
   try {
-    const res = await fetch(url + '/api/clans');
+    const res = await fetch(state.apiUrl + '/api/clans');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const clans = await res.json();
-    
-    const sel = document.getElementById('clanSelect');
-    sel.innerHTML = '<option value="">Selecione um clã</option>' +
-      clans.map(c => `<option value="${c.tag}">${c.name || c.tag}</option>`).join('');
-    
-    sel.onchange = () => loadClanData(sel.value);
-    setStatus(true, `${clans.length} clã(s) encontrado(s)`);
-    
-    if (clans.length > 0) {
-      sel.value = clans[0].tag;
-      loadClanData(clans[0].tag);
+
+    if (clans && clans.length > 0) {
+      const clan = clans[0];
+      state.clanTag = clan.tag;
+      document.getElementById('clanLabel').textContent = clan.name || clan.tag;
+      await loadClanData(clan.tag);
+    } else {
+      setStatus(false, 'Nenhum clã encontrado.');
     }
   } catch (err) {
     setStatus(false, 'Erro de conexão: ' + err.message);
@@ -320,10 +286,7 @@ async function connect() {
 }
 
 async function loadClanData(tag) {
-  if (!tag) return;
-  state.clanTag = tag;
-  document.getElementById('clanLabel').textContent = tag;
-  setStatus(true, 'Carregando dados…');
+  setStatus(true, 'Carregando todos os membros...');
 
   try {
     const [wdRes, prRes] = await Promise.all([
@@ -362,43 +325,45 @@ function togglePromoSort(column) {
 
 function renderAttackTable() {
   const wrap = document.getElementById('attackTableWrap');
-  if (!state.warDays.length) {
+  if (!state.warDays || !state.warDays.length) {
     wrap.innerHTML = '<div class="empty-state">Nenhum dado de ataque registrado.</div>';
     return;
   }
 
-  // Agrupar dias de guerra por periodo/secao
+  // Agrupar os dias de guerra por chave única de período/dia
   const daysMap = new Map();
   state.warDays.forEach(row => {
-    const key = `${row.section_index}-${row.period_index}`;
+    const section = row.section_index ?? row.section ?? 0;
+    const period = row.period_index ?? row.period ?? 0;
+    const dayNumber = row.day_number ?? (period % 7) || 7;
+    const key = `${section}-${period}`;
+
     if (!daysMap.has(key)) {
-      daysMap.set(key, { 
-        key,
-        section: row.section_index, 
-        period: row.period_index, 
-        dayNumber: row.day_number || (row.period_index % 7) || 7
-      });
+      daysMap.set(key, { key, section, period, dayNumber });
     }
   });
 
   let days = Array.from(daysMap.values()).sort((a, b) => a.period - b.period);
+
+  // Se não estiver no modo histórico completo, filtra para mostrar a última seção/semana registrada
   if (!state.showHistory && days.length > 0) {
     const lastSection = days[days.length - 1].section;
     days = days.filter(d => d.section === lastSection);
   }
 
-  // Mapear membros e seus ataques nos dias filtrados
+  // Mapear TODOS os membros independentemente de formato da API
   const membersMap = new Map();
   state.warDays.forEach(row => {
-    if (!membersMap.has(row.member_tag)) {
-      membersMap.set(row.member_tag, {
-        tag: row.member_tag,
-        name: row.member_name || 'Desconhecido',
-        rank: row.member_rank || 'member',
-        byPeriod: {}
-      });
+    const tag = row.member_tag || row.player_tag || row.tag || row.member_name || 'unknown';
+    const name = row.member_name || row.player_name || row.name || tag;
+    const rank = row.member_rank || row.role || row.rank || 'membro';
+    const period = row.period_index ?? row.period ?? 0;
+    const decks = row.decks_used ?? row.decksused ?? row.attacks ?? 0;
+
+    if (!membersMap.has(tag)) {
+      membersMap.set(tag, { tag, name, rank, byPeriod: {} });
     }
-    membersMap.get(row.member_tag).byPeriod[row.period_index] = row.decks_used ?? 0;
+    membersMap.get(tag).byPeriod[period] = decks;
   });
 
   let members = Array.from(membersMap.values()).map(m => {
@@ -434,7 +399,7 @@ function renderAttackTable() {
     <thead>
       <tr>
         <th class="num-col">#</th>
-        <th onclick="toggleSort(-1)">Membro ${getSortInd('name')}</th>
+        <th onclick="toggleSort(-1)">Membro (${members.length}) ${getSortInd('name')}</th>
         <th onclick="toggleSort(-2)">Total ${getSortInd('total')}</th>
         ${headerCells}
       </tr>
@@ -470,26 +435,26 @@ function renderPromotions() {
 
   let list = [];
 
-  // Se a tabela de promoções já veio calculada do backend
   if (state.promotions && state.promotions.length > 0) {
     const latestRun = state.promotions[0].calculated_at;
     list = state.promotions.filter(p => p.calculated_at === latestRun).map(p => ({
-      member_name: p.member_name,
-      member_rank: p.member_rank || 'member',
-      avg4w: Number(p.avg_4w || 0),
-      avg8w: Number(p.avg_8w || 0),
-      refSection: p.reference_section_index
+      member_name: p.member_name || p.player_name || 'Membro',
+      member_rank: p.member_rank || p.role || 'membro',
+      avg4w: Number(p.avg_4w || p.media_4_guerra || 0),
+      avg8w: Number(p.avg_8w || p.media_8_guerra || 0)
     }));
-  } else if (state.warDays.length > 0) {
-    // Cálculo Dinâmico de Contingência (caso a tabela esteja vazia)
+  } else if (state.warDays && state.warDays.length > 0) {
     const membersMap = new Map();
     state.warDays.forEach(row => {
-      if (!membersMap.has(row.member_tag)) {
-        membersMap.set(row.member_tag, { name: row.member_name, rank: row.member_rank || 'member', scores: [] });
+      const tag = row.member_tag || row.player_tag || row.tag || row.member_name;
+      const name = row.member_name || row.player_name || row.name || tag;
+      const rank = row.member_rank || row.role || 'membro';
+      const fame = row.fame ?? row.player_total_fame ?? 0;
+
+      if (!membersMap.has(tag)) {
+        membersMap.set(tag, { name, rank, scores: [] });
       }
-      if (row.fame !== undefined && row.fame !== null) {
-        membersMap.get(row.member_tag).scores.push(row.fame);
-      }
+      membersMap.get(tag).scores.push(fame);
     });
 
     membersMap.forEach((data) => {
@@ -511,7 +476,6 @@ function renderPromotions() {
   const elders = list.filter(p => (p.member_rank === 'member' || p.member_rank === 'membro') && p.avg4w >= 2500);
   const coLeaders = list.filter(p => (p.member_rank === 'elder' || p.member_rank === 'anciã' || p.member_rank === 'anciao') && p.avg8w >= 2500);
 
-  // Render Promoções Ancões
   elderSection.innerHTML = `
     <h3>⭐ Promover a Ancião <span class="badge-count">${elders.length}</span></h3>
     ${elders.length ? `
@@ -529,7 +493,6 @@ function renderPromotions() {
       </table>` : '<div class="empty-state" style="padding:10px;">Nenhum membro elegível no momento.</div>'}
   `;
 
-  // Render Promoções Colíderes
   coLeaderSection.innerHTML = `
     <h3>👑 Promover a Colíder <span class="badge-count">${coLeaders.length}</span></h3>
     ${coLeaders.length ? `
@@ -547,7 +510,6 @@ function renderPromotions() {
       </table>` : '<div class="empty-state" style="padding:10px;">Nenhum ancião elegível no momento.</div>'}
   `;
 
-  // Tabela Completa de Médias
   list.sort((a, b) => {
     let cmp = 0;
     if (state.promoSortMode === 'name') cmp = a.member_name.localeCompare(b.member_name);
@@ -600,16 +562,7 @@ function render() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const apiParam = urlParams.get('api');
-  const savedUrl = localStorage.getItem('clash_api_url');
-  
-  const initialUrl = apiParam || savedUrl || 'https://api.seu-projeto.vercel.app';
-  document.getElementById('apiUrl').value = initialUrl;
-  
-  if (apiParam || savedUrl) {
-    connect();
-  }
+  initConnection();
 });
 </script>
 </body>
