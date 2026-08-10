@@ -1,599 +1,68 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Clash Clan Tracker - Painel Completo</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --bg: #0B1220;
-    --surface: #151F35;
-    --surface-2: #1C2A45;
-    --border: #263454;
-    --gold: #E8B44A;
-    --gold-dim: #6B5527;
-    --blue: #4F7CFF;
-    --success: #3ECF8E;
-    --warning: #F2A93B;
-    --danger: #F0563D;
-    --text: #F1F4FA;
-    --text-muted: #8C97B3;
-    --text-faint: #5A6584;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Inter', sans-serif;
-    padding: 32px 24px 80px;
-  }
-  .wrap { max-width: 1080px; margin: 0 auto; }
-
-  h1, h2, h3 {
-    font-family: 'Rajdhani', sans-serif;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
-    margin: 0;
-  }
-  h1 { font-size: 28px; }
-  h2 { font-size: 18px; color: var(--text-muted); font-weight: 600; }
-  h3 { font-size: 15px; color: var(--gold); font-weight: 600; margin: 16px 0 10px 0; }
-
-  .eyebrow {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--gold);
-  }
-
-  header {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 16px;
-    margin-bottom: 28px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .status-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 6px 14px 6px 10px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-    color: var(--text-muted);
-  }
-  .dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: var(--text-faint);
-    flex-shrink: 0;
-  }
-  .dot.live { background: var(--success); box-shadow: 0 0 0 3px rgba(62,207,142,0.18); animation: pulse 1.6s infinite; }
-  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
-
-  .panel {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 20px 20px 24px;
-    margin-bottom: 20px;
-  }
-
-  .config-grid {
-    display: grid;
-    grid-template-columns: 2fr 1fr auto;
-    gap: 10px;
-    margin-top: 12px;
-  }
-  input, select {
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 8px;
-    padding: 10px 12px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
-    width: 100%;
-  }
-  button {
-    background: var(--gold);
-    color: #241C08;
-    border: none;
-    border-radius: 8px;
-    padding: 10px 18px;
-    font-family: 'Rajdhani', sans-serif;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    font-size: 13px;
-    cursor: pointer;
-  }
-  button:hover { filter: brightness(1.08); }
-  button.ghost {
-    background: transparent;
-    color: var(--text-muted);
-    border: 1px solid var(--border);
-  }
-  .hint { font-size: 12px; color: var(--text-faint); margin-top: 8px; }
-
-  .toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 16px;
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-  .toolbar-actions { display: flex; gap: 8px; }
-  .toolbar-actions button { padding: 8px 14px; font-size: 12px; }
-
-  .table-scroll { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; min-width: 600px; }
-  thead th {
-    text-align: left;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    color: var(--text-faint);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    padding: 0 10px 10px;
-    border-bottom: 1px solid var(--border);
-    cursor: pointer;
-    user-select: none;
-  }
-  thead th:hover { color: var(--text); }
-  thead th.day-col { text-align: center; }
-  thead th.num-col { 
-    text-align: center; 
-    width: 40px;
-    cursor: default;
-  }
-  
-  tbody td {
-    padding: 10px;
-    border-bottom: 1px solid var(--border);
-    vertical-align: middle;
-  }
-  tbody tr:last-child td { border-bottom: none; }
-  tbody td.num-col {
-    text-align: center;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-    color: var(--text-faint);
-    width: 40px;
-  }
-  
-  .member-name { font-weight: 500; font-size: 14px; }
-  .member-total { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-faint); }
-
-  .shield-cell { text-align: center; }
-  .shield { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
-  .shield svg { display: block; }
-  .shield-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-faint); }
-
-  .empty-state {
-    text-align: center;
-    padding: 40px 20px;
-    color: var(--text-faint);
-    font-size: 13px;
-  }
-
-  .promo-section { margin-bottom: 20px; }
-  .promo-section:last-child { margin-bottom: 0; }
-  .promo-section h3 { display: flex; align-items: center; gap: 12px; }
-  .promo-section h3 .badge-count {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    background: var(--surface-2);
-    padding: 2px 10px;
-    border-radius: 999px;
-    color: var(--text-muted);
-  }
-  .promo-table-wrap { overflow-x: auto; }
-  .promo-table-wrap table { font-size: 13px; }
-  .promo-table-wrap table th { font-size: 10px; padding: 6px 10px; }
-  .promo-table-wrap table td { padding: 6px 10px; }
-  .promo-table-wrap table td:first-child { font-weight: 500; }
-  .promo-table-wrap table td.num-col {
-    text-align: center;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    color: var(--text-faint);
-    width: 35px;
-  }
-  .promo-badge-cell { text-align: center; }
-  .badge {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    padding: 2px 8px;
-    border-radius: 999px;
-    display: inline-block;
-  }
-  .badge.eligible { background: rgba(232,180,74,0.16); color: var(--gold); border: 1px solid var(--gold-dim); }
-  .badge.promote-elder { background: rgba(62,207,142,0.16); color: var(--success); border: 1px solid rgba(62,207,142,0.3); }
-  .badge.promote-coleader { background: rgba(79,124,255,0.16); color: var(--blue); border: 1px solid rgba(79,124,255,0.3); }
-
-  .ref-note { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-faint); margin-top: 14px; }
-  .sort-indicator { font-size: 10px; margin-left: 4px; }
-  .promo-rank {
-    font-size: 10px;
-    color: var(--text-faint);
-    font-family: 'JetBrains Mono', monospace;
-    text-transform: uppercase;
-  }
-</style>
+    <meta charset="UTF-8">
+    <title>Dados Detalhados</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        h1 {
+            color: #2c3e50;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            margin-top: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #2c3e50;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+    </style>
 </head>
 <body>
-<div class="wrap">
 
-  <header>
-    <div>
-      <div class="eyebrow" id="clanLabel">Carregando Clã...</div>
-      <h1>Clash Clan Tracker</h1>
-    </div>
-    <div class="status-pill">
-      <span class="dot" id="statusDot"></span>
-      <span id="statusText">Conectando...</span>
-    </div>
-  </header>
+    <h1>Painel de Dados</h1>
+    <p>Aqui estão todas as informações organizadas:</p>
 
-  <div class="panel">
-    <h2>Conexão de Clãs</h2>
-    <div class="config-grid">
-      <input id="apiUrl" readonly style="opacity: 0.6; cursor: not-allowed;" value="https://clash-tracker-six.vercel.app" />
-      <select id="clanSelect" onchange="loadClanData(this.value)">
-        <option value="LLJ8JQ99">Clã Principal (LLJ8JQ99)</option>
-        <option value="229G9V9Q">Clã Secundário (229G9V9Q)</option>
-        <option value="QVQ9R80V">Clã 3 (QVQ9R80V)</option>
-        <option value="QGRRJLLG">Clã 4 (QGRRJLLG)</option>
-      </select>
-      <button onclick="connect()">Carregar Clã</button>
-    </div>
-    <p class="hint">Escolha o clã no menu e clique em carregar para sincronizar os dados.</p>
-  </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Item / Descrição</th>
+                <th>Categoria</th>
+                <th>Detalhes / Medida</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Exemplo de Dado 1</td>
+                <td>Geral</td>
+                <td>--</td>
+                <td>Ativo</td>
+            </tr>
+            <tr>
+                <td>Exemplo de Dado 2</td>
+                <td>Geral</td>
+                <td>--</td>
+                <td>Pendente</td>
+            </tr>
+        </tbody>
+    </table>
 
-  <div class="panel">
-    <div class="toolbar">
-      <h2 style="margin:0">Ataques por Dia de Guerra</h2>
-      <div class="toolbar-actions">
-        <button class="ghost" onclick="toggleHistory()" id="historyBtn">Ver histórico completo</button>
-      </div>
-    </div>
-    <div class="table-scroll" id="attackTableWrap"></div>
-  </div>
-
-  <div class="panel">
-    <h2 style="margin-bottom:14px">Painel de Promoções Automáticas</h2>
-    
-    <div id="promoElderSection" class="promo-section"></div>
-    <div id="promoCoLeaderSection" class="promo-section"></div>
-    
-    <div style="margin-top: 24px; border-top: 1px solid var(--border); padding-top: 20px;">
-      <h3 style="color: var(--text-muted); font-size: 13px;">📊 Médias Gerais de Fama por Membro</h3>
-      <div class="table-scroll" id="promoFullTableWrap"></div>
-    </div>
-    
-    <div class="ref-note" id="promoRef"></div>
-  </div>
-
-</div>
-
-<script>
-const API_BASE_URL = 'https://clash-tracker-six.vercel.app';
-
-const state = {
-  apiUrl: API_BASE_URL,
-  clanTag: 'LLJ8JQ99',
-  warDays: [],
-  promotions: [],
-  sortMode: 'total',
-  sortAsc: false,
-  showHistory: false,
-  promoSortMode: 'avg4w',
-  promoSortAsc: false,
-};
-
-function shieldSVG(used, total) {
-  size = 28;
-  total = total || 4;
-  const pct = used / total;
-  let color = 'var(--danger)';
-  if (pct >= 1) color = 'var(--gold)';
-  else if (pct > 0) color = 'var(--warning)';
-
-  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24">
-    <path d="M12 2 L21 5 V11 C21 16.5 17 20.5 12 22 C7 20.5 3 16.5 3 11 V5 Z" fill="none" stroke="${pct===0?'var(--danger)':'var(--border)'}" stroke-width="1.5"/>
-    <path d="M12 2 L21 5 V11 C21 16.5 17 20.5 12 22 C7 20.5 3 16.5 3 11 V5 Z" fill="${color}" opacity="${pct===0?0:0.85}" transform="scale(${Math.max(pct,0.001)})" transform-origin="12 22"/>
-  </svg>`;
-}
-
-function setStatus(connected, text) {
-  document.getElementById('statusDot').className = connected ? 'dot live' : 'dot';
-  document.getElementById('statusText').textContent = text;
-}
-
-async function connect() {
-  const sel = document.getElementById('clanSelect');
-  const tag = sel.value || 'LLJ8JQ99';
-
-  try {
-    const res = await fetch(API_BASE_URL + '/api/clans').catch(() => null);
-    if (res && res.ok) {
-      const clans = await res.json();
-      if (Array.isArray(clans) && clans.length > 0) {
-        sel.innerHTML = clans.map(c => {
-          const cTag = (c.tag || c.clan_tag || '').replace('#', '');
-          const cName = c.name || c.clan_name || cTag;
-          return `<option value="${cTag}">${cName} (${cTag})</option>`;
-        }).join('');
-        if ([...sel.options].some(o => o.value === tag)) {
-          sel.value = tag;
-        }
-      }
-    }
-  } catch (e) {
-    console.log("Servidor ocupado. Mantendo clãs salvos.");
-  }
-
-  loadClanData(sel.value || tag);
-}
-
-async function loadClanData(tag) {
-  if (!tag) tag = 'LLJ8JQ99';
-  state.clanTag = tag;
-  const cleanTag = tag.replace('#', '');
-  document.getElementById('clanLabel').textContent = '#' + cleanTag;
-  setStatus(true, 'Carregando ' + cleanTag + '...');
-
-  try {
-    const [wdRes, prRes] = await Promise.all([
-      fetch(`${API_BASE_URL}/api/war-days/${cleanTag}`).catch(() => null),
-      fetch(`${API_BASE_URL}/api/promotions/${cleanTag}`).catch(() => null)
-    ]);
-
-    state.warDays = (wdRes && wdRes.ok) ? await wdRes.json() : [];
-    state.promotions = (prRes && prRes.ok) ? await prRes.json() : [];
-
-    setStatus(true, 'Conectado · ' + cleanTag);
-    render();
-  } catch (err) {
-    setStatus(true, 'Conectado · ' + cleanTag);
-    render();
-  }
-}
-
-function toggleSort(columnIndex) {
-  const key = columnIndex === -1 ? 'name' : (columnIndex === -2 ? 'total' : `day-${columnIndex}`);
-  if (state.sortMode === key) state.sortAsc = !state.sortAsc;
-  else { state.sortMode = key; state.sortAsc = false; }
-  render();
-}
-
-function toggleHistory() {
-  state.showHistory = !state.showHistory;
-  document.getElementById('historyBtn').textContent = state.showHistory ? 'Ver só semana atual' : 'Ver histórico completo';
-  render();
-}
-
-function togglePromoSort(column) {
-  if (state.promoSortMode === column) state.promoSortAsc = !state.promoSortAsc;
-  else { state.promoSortMode = column; state.promoSortAsc = false; }
-  renderPromotions();
-}
-
-function renderAttackTable() {
-  const wrap = document.getElementById('attackTableWrap');
-  if (!state.warDays || !state.warDays.length) {
-    wrap.innerHTML = '<div class="empty-state">Nenhum dado de ataque encontrado para este clã.</div>';
-    return;
-  }
-
-  const daysMap = new Map();
-  state.warDays.forEach(row => {
-    const sec = row.section_index ?? row.section ?? 0;
-    const per = row.period_index ?? row.period ?? 0;
-    const dayNum = row.day_number ?? ((per % 7) || 7);
-    const key = `${sec}-${per}`;
-    if (!daysMap.has(key)) daysMap.set(key, { key, sec, per, dayNum });
-  });
-
-  let days = Array.from(daysMap.values()).sort((a, b) => a.per - b.per);
-  if (!state.showHistory && days.length > 0) {
-    const maxSec = Math.max(...days.map(d => d.sec));
-    days = days.filter(d => d.sec === maxSec);
-  }
-
-  const membersMap = new Map();
-  state.warDays.forEach(row => {
-    const tag = row.member_tag || row.player_tag || row.tag || row.member_name;
-    const name = row.member_name || row.player_name || row.name || tag;
-    const rank = row.member_rank || row.role || row.rank || 'membro';
-    const per = row.period_index ?? row.period ?? 0;
-    const decks = row.decks_used ?? row.decksused ?? row.attacks ?? 0;
-
-    if (!membersMap.has(tag)) {
-      membersMap.set(tag, { tag, name, rank, byPeriod: {} });
-    }
-    membersMap.get(tag).byPeriod[per] = decks;
-  });
-
-  let members = Array.from(membersMap.values()).map(m => {
-    const dayValues = days.map(d => m.byPeriod[d.per] ?? null);
-    const valid = dayValues.filter(v => v !== null);
-    const total = valid.reduce((a, b) => a + b, 0);
-    const maxTotal = valid.length * 4;
-    return { ...m, dayValues, total, maxTotal };
-  });
-
-  members.sort((a, b) => {
-    let cmp = 0;
-    if (state.sortMode === 'name') cmp = a.name.localeCompare(b.name);
-    else if (state.sortMode === 'total') cmp = a.total - b.total;
-    else if (state.sortMode.startsWith('day-')) {
-      const idx = parseInt(state.sortMode.split('-')[1]);
-      cmp = (a.dayValues[idx] ?? -1) - (b.dayValues[idx] ?? -1);
-    }
-    return state.sortAsc ? cmp : -cmp;
-  });
-
-  const getInd = (k) => state.sortMode === k ? `<span class="sort-indicator">${state.sortAsc ? '▲' : '▼'}</span>` : '';
-
-  const headerCells = days.map((d, idx) => 
-    `<th class="day-col" onclick="toggleSort(${idx})">
-      Dia ${d.dayNum}<br><span style="opacity:.6;font-size:9px">${d.sec}-${d.per}</span>
-      ${getInd(`day-${idx}`)}
-    </th>`
-  ).join('');
-
-  wrap.innerHTML = `<table>
-    <thead>
-      <tr>
-        <th class="num-col">#</th>
-        <th onclick="toggleSort(-1)">Membro (${members.length}) ${getInd('name')}</th>
-        <th onclick="toggleSort(-2)">Total ${getInd('total')}</th>
-        ${headerCells}
-      </tr>
-    </thead>
-    <tbody>
-      ${members.map((m, i) => `
-        <tr>
-          <td class="num-col">${i + 1}</td>
-          <td>
-            <div class="member-name">${m.name}</div>
-            <div class="promo-rank">${m.rank}</div>
-          </td>
-          <td><div class="member-total">${m.total}/${m.maxTotal}</div></td>
-          ${m.dayValues.map(used => used === null ? '<td class="shield-cell"><span style="color:var(--text-faint)">—</span></td>' : `<td class="shield-cell"><span class="shield">${shieldSVG(used, 4)}<span class="shield-label">${used}/4</span></span></td>`).join('')}
-        </tr>
-      `).join('')}
-    </tbody>
-  </table>`;
-}
-
-function renderPromotions() {
-  const elderSection = document.getElementById('promoElderSection');
-  const coLeaderSection = document.getElementById('promoCoLeaderSection');
-  const fullTableWrap = document.getElementById('promoFullTableWrap');
-  const ref = document.getElementById('promoRef');
-
-  let list = [];
-
-  if (state.promotions && state.promotions.length > 0) {
-    const latestDate = state.promotions[0].calculated_at;
-    list = state.promotions.filter(p => p.calculated_at === latestDate).map(p => ({
-      member_name: p.member_name || p.player_name || 'Membro',
-      member_rank: p.member_rank || p.role || 'membro',
-      avg4w: Number(p.avg_4w || p.media_4_guerra || 0),
-      avg8w: Number(p.avg_8w || p.media_8_guerra || 0)
-    }));
-  } else if (state.warDays && state.warDays.length > 0) {
-    const membersMap = new Map();
-    state.warDays.forEach(row => {
-      const tag = row.member_tag || row.player_tag || row.tag || row.member_name;
-      const name = row.member_name || row.player_name || row.name || tag;
-      const rank = row.member_rank || row.role || 'membro';
-      const fame = row.fame ?? row.player_total_fame ?? 0;
-
-      if (!membersMap.has(tag)) membersMap.set(tag, { name, rank, scores: [] });
-      membersMap.get(tag).scores.push(fame);
-    });
-
-    membersMap.forEach((data) => {
-      const s = data.scores;
-      const avg4w = s.length ? (s.slice(-4).reduce((a,b)=>a+b,0) / Math.min(s.length, 4)) : 0;
-      const avg8w = s.length ? (s.slice(-8).reduce((a,b)=>a+b,0) / Math.min(s.length, 8)) : 0;
-      list.push({ member_name: data.name, member_rank: data.rank, avg4w, avg8w });
-    });
-  }
-
-  if (!list.length) {
-    elderSection.innerHTML = '';
-    coLeaderSection.innerHTML = '';
-    fullTableWrap.innerHTML = '<div class="empty-state">Sem dados de promoção para este clã.</div>';
-    ref.textContent = '';
-    return;
-  }
-
-  const promoteToElder = list.filter(p => (p.member_rank === 'member' || p.member_rank === 'membro') && p.avg4w >= 2500);
-  const promoteToCoLeader = list.filter(p => (p.member_rank === 'elder' || p.member_rank === 'anciã' || p.member_rank === 'anciao') && p.avg8w >= 2500);
-
-  elderSection.innerHTML = `
-    <h3>⭐ Promover a Ancião <span class="badge-count">${promoteToElder.length}</span></h3>
-    ${promoteToElder.length ? `<div class="promo-table-wrap"><table><thead><tr><th class="num-col">#</th><th>Membro</th><th>Cargo atual</th><th style="text-align:center;">Média 4 semanas</th><th style="text-align:center;">Status</th></tr></thead><tbody>
-    ${promoteToElder.map((p, i) => `<tr><td class="num-col">${i+1}</td><td>${p.member_name}</td><td><span class="promo-rank">${p.member_rank}</span></td><td style="text-align:center;font-family:'JetBrains Mono';">${Math.round(p.avg4w)}</td><td class="promo-badge-cell"><span class="badge promote-elder">✅ Promover a Ancião</span></td></tr>`).join('')}
-    </tbody></table></div>` : '<div class="empty-state" style="padding:12px; font-size:12px;">Nenhum membro elegível para promoção a Ancião no momento.</div>'}
-  `;
-
-  coLeaderSection.innerHTML = `
-    <h3>👑 Promover a Colíder <span class="badge-count">${promoteToCoLeader.length}</span></h3>
-    ${promoteToCoLeader.length ? `<div class="promo-table-wrap"><table><thead><tr><th class="num-col">#</th><th>Membro</th><th>Cargo atual</th><th style="text-align:center;">Média 8 semanas</th><th style="text-align:center;">Status</th></tr></thead><tbody>
-    ${promoteToCoLeader.map((p, i) => `<tr><td class="num-col">${i+1}</td><td>${p.member_name}</td><td><span class="promo-rank">${p.member_rank}</span></td><td style="text-align:center;font-family:'JetBrains Mono';">${Math.round(p.avg8w)}</td><td class="promo-badge-cell"><span class="badge promote-coleader">✅ Promover a Colíder</span></td></tr>`).join('')}
-    </tbody></table></div>` : '<div class="empty-state" style="padding:12px; font-size:12px;">Nenhum membro elegível para promoção a Colíder no momento.</div>'}
-  `;
-
-  list.sort((a, b) => {
-    let cmp = 0;
-    if (state.promoSortMode === 'name') cmp = a.member_name.localeCompare(b.member_name);
-    else if (state.promoSortMode === 'avg4w') cmp = a.avg4w - b.avg4w;
-    else if (state.promoSortMode === 'avg8w') cmp = a.avg8w - b.avg8w;
-    return state.promoSortAsc ? cmp : -cmp;
-  });
-
-  const getInd = (c) => state.promoSortMode === c ? `<span class="sort-indicator">${state.promoSortAsc ? '▲' : '▼'}</span>` : '';
-
-  fullTableWrap.innerHTML = `<div class="promo-table-wrap"><table>
-    <thead>
-      <tr>
-        <th class="num-col">#</th>
-        <th onclick="togglePromoSort('name')">Membro ${getInd('name')}</th>
-        <th>Cargo</th>
-        <th style="text-align:center;" onclick="togglePromoSort('avg4w')">Média 4 semanas ${getInd('avg4w')}</th>
-        <th style="text-align:center;" onclick="togglePromoSort('avg8w')">Média 8 semanas ${getInd('avg8w')}</th>
-        <th style="text-align:center;">Elegível</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${list.map((p, i) => {
-        let elegivel = '—';
-        if ((p.member_rank === 'member' || p.member_rank === 'membro') && p.avg4w >= 2500) elegivel = 'Ancião';
-        else if ((p.member_rank === 'elder' || p.member_rank === 'anciao') && p.avg8w >= 2500) elegivel = 'Colíder';
-
-        return `<tr>
-          <td class="num-col">${i+1}</td>
-          <td>${p.member_name}</td>
-          <td><span class="promo-rank">${p.member_rank}</span></td>
-          <td style="text-align:center;font-family:'JetBrains Mono';">${Math.round(p.avg4w)}</td>
-          <td style="text-align:center;font-family:'JetBrains Mono';">${Math.round(p.avg8w)}</td>
-          <td style="text-align:center;">${elegivel !== '—' ? `<span class="badge eligible">${elegivel}</span>` : '—'}</td>
-        </tr>`;
-      }).join('')}
-    </tbody>
-  </table></div>`;
-
-  ref.textContent = `Total de membros analisados: ${list.length}`;
-}
-
-function render() {
-  renderAttackTable();
-  renderPromotions();
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  connect();
-});
-</script>
 </body>
 </html>
