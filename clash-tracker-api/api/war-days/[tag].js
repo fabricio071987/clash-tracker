@@ -17,7 +17,6 @@ export default async function handler(req, res) {
   const decodedTag = decodeURIComponent(tag);
 
   try {
-    // Adicionado Promise.race para garantir timeout de 5s e não travar o navegador
     const result = await Promise.race([
       turso.execute({
         sql: `
@@ -28,18 +27,16 @@ export default async function handler(req, res) {
             RANK() OVER (PARTITION BY section_index ORDER BY period_index) AS day_number
           FROM war_days
           WHERE clan_tag = ? AND is_active = 1
-          ORDER BY period_index DESC, member_name ASC
-          LIMIT 1000
+          ORDER BY member_name ASC
         `,
         args: [decodedTag]
       }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Turso')), 5000))
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Turso')), 6000))
     ]);
 
     res.status(200).json(result.rows);
   } catch (error) {
     console.error('Erro:', error.message);
-    // Se der erro ou timeout, devolve array vazio para o site não travar
     res.status(200).json([]);
   }
 }
