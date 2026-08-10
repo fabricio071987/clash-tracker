@@ -5,6 +5,18 @@ const turso = createClient({
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
+// Função para ler com timeout (segurança)
+async function queryTurso(sql) {
+  try {
+    return await Promise.race([
+      turso.execute(sql),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Turso (5s)')), 5000))
+    ]);
+  } catch (err) {
+    throw new Error(`Erro ao buscar clãs: ${err.message}`);
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -14,9 +26,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const result = await turso.execute(
-      'SELECT tag, name, enabled FROM clans ORDER BY name'
-    );
+    const result = await queryTurso('SELECT tag, name, enabled FROM clans ORDER BY name');
     res.status(200).json(result.rows);
   } catch (error) {
     console.error('Erro:', error);
