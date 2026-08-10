@@ -7,7 +7,7 @@ const turso = createClient({
 
 const ROYALE_API_BASE = process.env.ROYALE_API_BASE || 'http://45.79.218.79/v1';
 
-async function callRoyaleAPI(path ) {
+async function callRoyaleAPI(path) {
   const token = process.env.ROYALE_API_TOKEN;
   const res = await fetch(`${ROYALE_API_BASE}${path}`, {
     headers: {
@@ -40,13 +40,6 @@ async function callRoyaleAPIWithRetry(path, retries = 2) {
 
 function encodeTag(tag) {
   return encodeURIComponent(tag);
-}
-
-async function saveToTurso(sql, args) {
-  await Promise.race([
-    turso.execute({ sql, args }),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Turso (5s)')), 5000))
-  ]);
 }
 
 async function calculatePromotions(clan) {
@@ -83,9 +76,8 @@ async function calculatePromotions(clan) {
 
     const referenceSectionIndex = items[0]?.sectionIndex ?? null;
     const now = new Date().toISOString();
-    let savedCount = 0;
+    const statements = [];
 
-    // GRAVA TODOS OS MEMBROS CORRETAMENTE
     for (const [memberTag, weeksFame] of fameByMember.entries()) {
       const memberInfo = memberMap.get(memberTag);
       const last4 = weeksFame.slice(0, 4);
@@ -95,34 +87,43 @@ async function calculatePromotions(clan) {
       const avg4 = sum4 / 4;
       const avg8 = sum8 / 8;
 
-      await saveToTurso(`
-        INSERT INTO promotions
-          (clan_tag, member_tag, member_name, member_rank,
-           reference_section_index,
-           sum_4w, avg_4w, eligible_elder, 
-           sum_8w, avg_8w, eligible_colider, 
-           calculated_at, is_active)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [
-        clan.tag,
-        memberTag,
-        memberInfo?.name || 'Membro',
-        memberInfo?.rank || 'member',
-        referenceSectionIndex,
-        sum4,
-        avg4,
-        avg4 >= 2500 ? 1 : 0,
-        sum8,
-        avg8,
-        avg8 >= 2500 ? 1 : 0,
-        now,
-        1
-      ]);
-      savedCount++;
+      statements.push({
+        sql: `
+          INSERT INTO promotions
+            (clan_tag, member_tag, member_name, member_rank,
+             reference_section_index,
+             sum_4w, avg_4w, eligible_elder, 
+             sum_8w, avg_8w, eligible_colider, 
+             calculated_at, is_active)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        args: [
+          clan.tag,
+          memberTag,
+          memberInfo?.name || 'Membro',
+          memberInfo?.rank || 'member',
+          referenceSectionIndex,
+          sum4,
+          avg4,
+          avg4 >= 2500 ? 1 : 0,
+          sum8,
+          avg8,
+          avg8 >= 2500 ? 1 : 0,
+          now,
+          1
+        ]
+      });
     }
 
-    console.log(`[PROMO] ${savedCount} membros salvos para ${clan.tag}`);
-    return { clan: clan.tag, status: 'success', saved: savedCount };
+    if (statements.length > 0) {
+      await Promise.race([
+        turso.batch(statements, "write"),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Turso Batch (15s)')), 15000))
+      ]);
+    }
+
+    console.log(`[PROMO] ${statements.length} membros salvos para ${clan.tag}`);
+    return { clan: clan.tag, status: 'success', saved: statements.length };
   } catch (err) {
     console.error(`[${clan.tag}] Erro nas promoções:`, err.message);
     throw err;
