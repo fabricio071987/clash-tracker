@@ -72,6 +72,7 @@ async function collectClanAttacks(clan) {
 
     const statements = [];
 
+    // 1. INSERÇÃO/ATUALIZAÇÃO DOS MEMBROS NA GUERRA ATUAL
     for (const p of participants) {
       if (!memberMap.has(p.tag)) continue;
       const memberInfo = memberMap.get(p.tag);
@@ -104,6 +105,21 @@ async function collectClanAttacks(clan) {
       });
     }
 
+    // 2. LIMPEZA AUTOMÁTICA: Deleta tudo que passar das últimas 20 rodadas do clã
+    statements.push({
+      sql: `
+        DELETE FROM war_days 
+        WHERE clan_tag = ? AND period_index NOT IN (
+          SELECT DISTINCT period_index 
+          FROM war_days 
+          WHERE clan_tag = ? 
+          ORDER BY period_index DESC 
+          LIMIT 20
+        )
+      `,
+      args: [clan.tag, clan.tag]
+    });
+
     if (statements.length > 0) {
       await Promise.race([
         turso.batch(statements, "write"),
@@ -111,7 +127,7 @@ async function collectClanAttacks(clan) {
       ]);
     }
 
-    return { clan: clan.tag, status: 'success', saved: statements.length };
+    return { clan: clan.tag, status: 'success', saved: statements.length - 1 };
   } catch (err) {
     console.error(`[${clan.tag}] Erro na coleta:`, err.message);
     throw err;
@@ -127,6 +143,7 @@ export default async function handler(req, res) {
     const { tag } = req.query;
     let clans = [];
 
+    // Aceita tag específica (?tag=%23XYZ) ou lê todos os clãs habilitados
     if (tag) {
       clans = [{ tag: decodeURIComponent(tag) }];
     } else {
