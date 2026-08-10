@@ -24,14 +24,14 @@ export default async function handler(req, res) {
     const result = await Promise.race([
       turso.execute({
         sql: `
-          SELECT * FROM promotions 
+          SELECT member_tag, member_name, member_rank, avg_4w, avg_8w, reference_section_index, calculated_at 
+          FROM promotions 
           WHERE clan_tag = ? AND is_active = 1 
           ORDER BY member_name ASC
-          LIMIT 2000
         `,
         args: [decodedTag]
       }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Turso (15s)')), 15000))
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Turso (25s)')), 25000))
     ]);
 
     res.status(200).json(result.rows);
