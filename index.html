@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Clash Clan Tracker</title>
+<title>Clash Clan Tracker - Painel Completo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
@@ -32,7 +32,7 @@
   }
   .wrap { max-width: 1080px; margin: 0 auto; }
 
-  h1, h2, h3, .display {
+  h1, h2, h3 {
     font-family: 'Rajdhani', sans-serif;
     font-weight: 700;
     letter-spacing: 0.02em;
@@ -159,7 +159,6 @@
     width: 40px;
     cursor: default;
   }
-  thead th.num-col:hover { color: var(--text-faint); }
   
   tbody td {
     padding: 10px;
@@ -252,23 +251,23 @@
   </header>
 
   <div class="panel">
-    <h2>Conexão</h2>
+    <h2>Conexão de Clãs</h2>
     <div class="config-grid">
       <input id="apiUrl" readonly style="opacity: 0.6; cursor: not-allowed;" value="https://clash-tracker-six.vercel.app" />
       <select id="clanSelect" onchange="loadClanData(this.value)">
-        <option value="LLJ8JQ99">Clã 1 (LLJ8JQ99)</option>
-        <option value="229G9V9Q">Clã 2 (229G9V9Q)</option>
+        <option value="LLJ8JQ99">Clã Principal (LLJ8JQ99)</option>
+        <option value="229G9V9Q">Clã Secundário (229G9V9Q)</option>
         <option value="QVQ9R80V">Clã 3 (QVQ9R80V)</option>
         <option value="QGRRJLLG">Clã 4 (QGRRJLLG)</option>
       </select>
       <button onclick="connect()">Carregar Clã</button>
     </div>
-    <p class="hint">Selecione qualquer um dos 4 clãs e clique em Carregar.</p>
+    <p class="hint">Escolha o clã no menu e clique em carregar para sincronizar os dados.</p>
   </div>
 
   <div class="panel">
     <div class="toolbar">
-      <h2 style="margin:0">Ataques por dia de guerra</h2>
+      <h2 style="margin:0">Ataques por Dia de Guerra</h2>
       <div class="toolbar-actions">
         <button class="ghost" onclick="toggleHistory()" id="historyBtn">Ver histórico completo</button>
       </div>
@@ -277,13 +276,13 @@
   </div>
 
   <div class="panel">
-    <h2 style="margin-bottom:14px">Promoções</h2>
+    <h2 style="margin-bottom:14px">Painel de Promoções Automáticas</h2>
     
     <div id="promoElderSection" class="promo-section"></div>
     <div id="promoCoLeaderSection" class="promo-section"></div>
     
     <div style="margin-top: 24px; border-top: 1px solid var(--border); padding-top: 20px;">
-      <h3 style="color: var(--text-muted); font-size: 13px;">📊 Todas as médias por membro</h3>
+      <h3 style="color: var(--text-muted); font-size: 13px;">📊 Médias Gerais de Fama por Membro</h3>
       <div class="table-scroll" id="promoFullTableWrap"></div>
     </div>
     
@@ -294,13 +293,6 @@
 
 <script>
 const API_BASE_URL = 'https://clash-tracker-six.vercel.app';
-
-const KNOWN_CLANS = [
-  { tag: 'LLJ8JQ99', name: 'Clã LLJ8JQ99' },
-  { tag: '229G9V9Q', name: 'Clã 229G9V9Q' },
-  { tag: 'QVQ9R80V', name: 'Clã QVQ9R80V' },
-  { tag: 'QGRRJLLG', name: 'Clã QGRRJLLG' }
-];
 
 const state = {
   apiUrl: API_BASE_URL,
@@ -314,8 +306,8 @@ const state = {
   promoSortAsc: false,
 };
 
-function shieldSVG(used, total, size) {
-  size = size || 28;
+function shieldSVG(used, total) {
+  size = 28;
   total = total || 4;
   const pct = used / total;
   let color = 'var(--danger)';
@@ -353,7 +345,7 @@ async function connect() {
       }
     }
   } catch (e) {
-    console.log("Mantendo lista padrão de clãs.");
+    console.log("Servidor ocupado. Mantendo clãs salvos.");
   }
 
   loadClanData(sel.value || tag);
