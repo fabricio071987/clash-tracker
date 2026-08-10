@@ -7,7 +7,7 @@ const turso = createClient({
 
 const ROYALE_API_BASE = process.env.ROYALE_API_BASE || 'http://45.79.218.79/v1';
 
-async function callRoyaleAPI(path ) {
+async function callRoyaleAPI(path) {
   const token = process.env.ROYALE_API_TOKEN;
   const res = await fetch(`${ROYALE_API_BASE}${path}`, {
     headers: {
@@ -42,13 +42,6 @@ function encodeTag(tag) {
   return encodeURIComponent(tag);
 }
 
-async function saveToTurso(sql, args) {
-  await Promise.race([
-    turso.execute({ sql, args }),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Turso (5s)')), 5000))
-  ]);
-}
-
 async function collectClanAttacks(clan) {
   console.log(`[ATTACKS] Coletando dados do clã ${clan.tag}`);
   
@@ -77,40 +70,48 @@ async function collectClanAttacks(clan) {
       return { clan: clan.tag, status: 'no_participants' };
     }
 
-    let savedCount = 0;
+    const statements = [];
 
     for (const p of participants) {
       if (!memberMap.has(p.tag)) continue;
       const memberInfo = memberMap.get(p.tag);
       
-      // Salva ou atualiza os ataques do membro na guerra atual
-      await saveToTurso(`
-        INSERT INTO war_days
-          (clan_tag, section_index, period_index, member_tag, member_name, 
-           member_rank, decks_used, decks_total, updated_at, is_active)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(clan_tag, period_index, member_tag) DO UPDATE SET
-          member_name = excluded.member_name,
-          member_rank = excluded.member_rank,
-          decks_used = excluded.decks_used,
-          updated_at = excluded.updated_at,
-          is_active = excluded.is_active
-      `, [
-        clan.tag,
-        sectionIndex,
-        periodIndex,
-        p.tag,
-        memberInfo?.name || p.name,
-        memberInfo?.rank || 'member',
-        p.decksUsedToday ?? 0,
-        4,
-        now,
-        1
-      ]);
-      savedCount++;
+      statements.push({
+        sql: `
+          INSERT INTO war_days
+            (clan_tag, section_index, period_index, member_tag, member_name, 
+             member_rank, decks_used, decks_total, updated_at, is_active)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(clan_tag, period_index, member_tag) DO UPDATE SET
+            member_name = excluded.member_name,
+            member_rank = excluded.member_rank,
+            decks_used = excluded.decks_used,
+            updated_at = excluded.updated_at,
+            is_active = excluded.is_active
+        `,
+        args: [
+          clan.tag,
+          sectionIndex,
+          periodIndex,
+          p.tag,
+          memberInfo?.name || p.name,
+          memberInfo?.rank || 'member',
+          p.decksUsedToday ?? 0,
+          4,
+          now,
+          1
+        ]
+      });
     }
 
-    return { clan: clan.tag, status: 'success', saved: savedCount };
+    if (statements.length > 0) {
+      await Promise.race([
+        turso.batch(statements, "write"),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Turso Batch (15s)')), 15000))
+      ]);
+    }
+
+    return { clan: clan.tag, status: 'success', saved: statements.length };
   } catch (err) {
     console.error(`[${clan.tag}] Erro na coleta:`, err.message);
     throw err;
