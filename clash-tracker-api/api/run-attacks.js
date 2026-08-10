@@ -107,7 +107,7 @@ async function collectClanAttacks(clan) {
     if (statements.length > 0) {
       await Promise.race([
         turso.batch(statements, "write"),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Turso Batch (15s)')), 15000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Turso Batch (25s)')), 25000))
       ]);
     }
 
@@ -124,8 +124,15 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    const clansResult = await turso.execute('SELECT tag, name FROM clans WHERE enabled = 1');
-    const clans = clansResult.rows;
+    const { tag } = req.query;
+    let clans = [];
+
+    if (tag) {
+      clans = [{ tag: decodeURIComponent(tag) }];
+    } else {
+      const clansResult = await turso.execute('SELECT tag, name FROM clans WHERE enabled = 1');
+      clans = clansResult.rows;
+    }
 
     const results = [];
     for (const clan of clans) {
