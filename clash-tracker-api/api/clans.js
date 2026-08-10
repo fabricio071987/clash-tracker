@@ -9,7 +9,7 @@ async function queryTurso(sql) {
   try {
     return await Promise.race([
       turso.execute(sql),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Turso (15s)')), 15000))
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Turso (25s)')), 25000))
     ]);
   } catch (err) {
     throw new Error(`Erro ao buscar clãs: ${err.message}`);
