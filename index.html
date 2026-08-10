@@ -4,295 +4,101 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Clash Clan Tracker</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #0B1220;
-    --surface: #151F35;
-    --surface-2: #1C2A45;
-    --border: #263454;
-    --gold: #E8B44A;
-    --gold-dim: #6B5527;
-    --blue: #4F7CFF;
-    --success: #3ECF8E;
-    --warning: #F2A93B;
-    --danger: #F0563D;
-    --text: #F1F4FA;
-    --text-muted: #8C97B3;
-    --text-faint: #5A6584;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    background: var(--bg );
-    color: var(--text);
-    font-family: 'Inter', sans-serif;
-    padding: 32px 24px 80px;
-  }
-  .wrap { max-width: 1080px; margin: 0 auto; }
-
-  h1, h2, h3, .display {
-    font-family: 'Rajdhani', sans-serif;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
-    margin: 0;
-  }
-  h1 { font-size: 28px; }
-  h2 { font-size: 18px; color: var(--text-muted); font-weight: 600; }
-  h3 { font-size: 15px; color: var(--gold); font-weight: 600; margin: 16px 0 10px 0; }
-
-  .eyebrow {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--gold);
-  }
-
-  header {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 16px;
-    margin-bottom: 28px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .status-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 6px 14px 6px 10px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-    color: var(--text-muted);
-  }
-  .dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: var(--text-faint);
-    flex-shrink: 0;
-  }
-  .dot.live { background: var(--success); box-shadow: 0 0 0 3px rgba(62,207,142,0.18); animation: pulse 1.6s infinite; }
-  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
-
-  .panel {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 20px 20px 24px;
-    margin-bottom: 20px;
-  }
-
-  .config-grid {
-    display: grid;
-    grid-template-columns: 2fr 1fr auto;
-    gap: 10px;
-    margin-top: 12px;
-  }
-  input, select {
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 8px;
-    padding: 10px 12px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
-    width: 100%;
-  }
-  button {
-    background: var(--gold);
-    color: #241C08;
-    border: none;
-    border-radius: 8px;
-    padding: 10px 18px;
-    font-family: 'Rajdhani', sans-serif;
-    font-weight: 700;
-    text-transform: uppercase;
-    cursor: pointer;
-  }
-  button:hover { filter: brightness(1.08); }
-
-  table { width: 100%; border-collapse: collapse; }
-  thead th {
-    text-align: left;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    color: var(--text-faint);
-    text-transform: uppercase;
-    padding: 0 10px 10px;
-    border-bottom: 1px solid var(--border);
-  }
-  tbody td {
-    padding: 10px;
-    border-bottom: 1px solid var(--border);
-    vertical-align: middle;
-  }
-  .empty-state { text-align: center; padding: 40px 20px; color: var(--text-faint); font-size: 13px; }
-  .badge {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    text-transform: uppercase;
-    padding: 2px 8px;
-    border-radius: 999px;
-    display: inline-block;
-  }
-  .badge.eligible { background: rgba(232,180,74,0.16); color: var(--gold); border: 1px solid var(--gold-dim); }
-  .promo-rank { font-size: 10px; color: var(--text-faint); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; }
+  body { background: #0B1220; color: #F1F4FA; font-family: Arial, sans-serif; padding: 20px; }
+  .wrap { max-width: 800px; margin: 0 auto; }
+  .panel { background: #151F35; border: 1px solid #263454; border-radius: 10px; padding: 15px; margin-bottom: 15px; }
+  h1 { color: #E8B44A; }
+  select, button { padding: 8px; background: #1C2A45; color: #fff; border: 1px solid #263454; border-radius: 5px; width: 100%; margin-bottom: 5px; }
+  button { background: #E8B44A; color: #000; font-weight: bold; cursor: pointer; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  th, td { border-bottom: 1px solid #263454; padding: 8px; text-align: left; }
+  .empty { color: #8C97B3; text-align: center; padding: 20px; }
 </style>
 </head>
 <body>
 <div class="wrap">
-
-  <header>
-    <div>
-      <div class="eyebrow" id="clanLabel">Nenhum clã conectado</div>
-      <h1>Clash Clan Tracker</h1>
-    </div>
-    <div class="status-pill">
-      <span class="dot" id="statusDot"></span>
-      <span id="statusText">Sem conexão</span>
-    </div>
-  </header>
-
+  <h1>⚔️ Clash Tracker</h1>
+  
   <div class="panel">
-    <h2>Conexão</h2>
-    <div class="config-grid">
-      <input id="apiUrl" readonly style="opacity: 0.6;" value="https://clash-tracker-six.vercel.app" />
-      <select id="clanSelect"><option value="">Selecione um clã</option></select>
-      <button onclick="connect( )">Conectar</button>
-    </div>
+    <label>Conectar:</label>
+    <select id="clanSelect"><option value="">Carregando clãs...</option></select>
+    <button onclick="connect()">Conectar</button>
   </div>
 
   <div class="panel">
-    <h2 style="margin-bottom:14px">Promoções e Desempenho</h2>
-    <div style="margin-top: 10px;">
-      <h3 style="color: var(--text-muted); font-size: 13px;">📊 Tabela Geral de Membros</h3>
-      <div id="promoFullTableWrap"></div>
-    </div>
-    <div class="ref-note" id="promoRef" style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-faint); margin-top:14px;"></div>
+    <h3>Ataques</h3>
+    <div id="attackTableWrap"><div class="empty">Aguardando dados...</div></div>
   </div>
 
+  <div class="panel">
+    <h3>Promoções</h3>
+    <div id="promoTableWrap"><div class="empty">Aguardando dados...</div></div>
+  </div>
 </div>
 
 <script>
-const API_BASE_URL = 'https://clash-tracker-six.vercel.app';
-
-const state = {
-  clanTag: '',
-  promotions: [],
-};
-
-function setStatus(connected, text ) {
-  document.getElementById('statusDot').className = connected ? 'dot live' : 'dot';
-  document.getElementById('statusText').textContent = text;
-}
+const API = 'https://clash-tracker-six.vercel.app';
 
 async function connect() {
-  setStatus(false, 'Conectando…');
+  const select = document.getElementById('clanSelect');
   try {
-    const res = await fetch(API_BASE_URL + '/api/clans');
-    const clans = await res.json();
-    const sel = document.getElementById('clanSelect');
-    sel.innerHTML = '<option value="">Selecione um clã</option>' +
-      clans.map(c => `<option value="${c.tag}">${c.name || c.tag}</option>`).join('');
-    sel.onchange = () => loadClanData(sel.value);
-    setStatus(clans.length > 0, clans.length > 0 ? clans.length + ' clã(s) encontrado(s)' : 'Nenhum clã cadastrado');
-    if (clans.length > 0) {
-      sel.value = clans[0].tag;
-      loadClanData(clans[0].tag);
+    // 1. Carrega lista de clãs
+    if (select.options.length === 1) {
+      const res = await fetch(API + '/api/clans');
+      const clans = await res.json();
+      select.innerHTML = '<option value="">Selecione um clã</option>' + clans.map(c => `<option value="${c.tag}">${c.name}</option>`).join('');
+      if (clans.length > 0) { select.value = clans[0].tag; loadClan(select.value); }
+      select.onchange = () => loadClan(select.value);
     }
-  } catch (err) {
-    setStatus(false, 'Erro ao conectar: ' + err.message);
-  }
+  } catch (e) { alert('Erro ao conectar: ' + e.message); }
 }
 
-async function loadClanData(tag) {
+async function loadClan(tag) {
   if (!tag) return;
-  state.clanTag = tag;
-  document.getElementById('clanLabel').textContent = tag;
-  setStatus(true, 'Carregando dados…');
+  document.getElementById('attackTableWrap').innerHTML = '<div class="empty">Carregando...</div>';
+  document.getElementById('promoTableWrap').innerHTML = '<div class="empty">Carregando...</div>';
+
   try {
-    const res = await fetch(API_BASE_URL + '/api/promotions/' + encodeURIComponent(tag));
-    const pr = await res.json();
+    // Só tenta carregar se demorar menos de 5 segundos
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 5000);
 
-    state.promotions = pr;
-    setStatus(true, 'Conectado · ' + tag);
-    renderPromotions();
+    const [war, promo] = await Promise.all([
+      fetch(API + '/api/war-days/' + encodeURIComponent(tag), { signal: controller.signal }).then(r => r.json()),
+      fetch(API + '/api/promotions/' + encodeURIComponent(tag), { signal: controller.signal }).then(r => r.json())
+    ]);
+
+    // Renderizar Guerra (simplificado)
+    if (war.length === 0) {
+      document.getElementById('attackTableWrap').innerHTML = '<div class="empty">Nenhuma guerra encontrada.</div>';
+    } else {
+      let html = '<table><tr><th>Membro</th><th>Ataques</th></tr>';
+      war.slice(0, 50).forEach(w => {
+        html += `<tr><td>${w.member_name}</td><td>${w.decks_used || 0}/4</td></tr>`;
+      });
+      html += '</table>';
+      document.getElementById('attackTableWrap').innerHTML = html;
+    }
+
+    // Renderizar Promoções (simplificado)
+    if (promo.length === 0) {
+      document.getElementById('promoTableWrap').innerHTML = '<div class="empty">Nenhuma promoção encontrada.</div>';
+    } else {
+      let html = '<table><tr><th>Membro</th><th>Cargo</th><th>Média</th></tr>';
+      promo.slice(0, 50).forEach(p => {
+        html += `<tr><td>${p.member_name}</td><td>${p.member_rank}</td><td>${Math.round(p.avg_4w || 0)}</td></tr>`;
+      });
+      html += '</table>';
+      document.getElementById('promoTableWrap').innerHTML = html;
+    }
+
   } catch (err) {
-    console.warn("Erro ao carregar dados:", err.message);
-    setStatus(true, 'Conectado (Erro ao buscar dados)');
+    document.getElementById('attackTableWrap').innerHTML = `<div class="empty">⏳ Vercel demorou, tente novamente.</div>`;
   }
 }
 
-function renderPromotions() {
-  const fullTableWrap = document.getElementById('promoFullTableWrap');
-  const ref = document.getElementById('promoRef');
-
-  if (!state.promotions || state.promotions.length === 0) {
-    fullTableWrap.innerHTML = '<div class="empty-state">Nenhum dado de promoção encontrado no banco. Acesse /api/run-promotions para gerar.</div>';
-    ref.textContent = '';
-    return;
-  }
-
-  const latestRun = state.promotions[0].calculated_at;
-  const latest = state.promotions.filter(p => p.calculated_at === latestRun);
-  const refSection = latest[0]?.reference_section_index;
-
-  const allMembers = latest.map(p => ({
-    ...p,
-    avg4w: p.avg_4w || 0,
-    avg8w: p.avg_8w || 0
-  }));
-
-  fullTableWrap.innerHTML = `
-    <div class="promo-table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Membro</th>
-            <th>Cargo</th>
-            <th style="text-align:center;">Média 4 Semanas</th>
-            <th style="text-align:center;">Média 8 Semanas</th>
-            <th style="text-align:center;">Elegível</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${allMembers.map((p, index) => {
-            let elegivel = '—';
-            if (p.member_rank === 'member' && p.avg4w >= 2500) elegivel = 'Ancião';
-            else if (p.member_rank === 'elder' && p.avg8w >= 2500) elegivel = 'Colíder';
-
-            return `
-              <tr>
-                <td>${index + 1}</td>
-                <td><strong>${p.member_name}</strong>  
-<small style="color:var(--text-faint);">${p.member_tag}</small></td>
-                <td><span class="promo-rank">${p.member_rank || 'membro'}</span></td>
-                <td style="text-align:center; font-family:'JetBrains Mono',monospace;">${Math.round(p.avg4w)}</td>
-                <td style="text-align:center; font-family:'JetBrains Mono',monospace;">${Math.round(p.avg8w)}</td>
-                <td style="text-align:center;">
-                  ${elegivel !== '—' ? `<span class="badge eligible">${elegivel}</span>` : '—'}
-                </td>
-              </tr>
-            `;
-          }).join('')}
-        </tbody>
-      </table>
-    </div>
-  `;
-
-  ref.textContent = `Referente à guerra ${refSection} · Calculado em ${new Date(latestRun).toLocaleString('pt-BR')}`;
-}
-
-window.onload = connect;
+connect();
 </script>
 </body>
 </html>
