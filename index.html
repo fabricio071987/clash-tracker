@@ -32,7 +32,7 @@
   }
   .wrap { max-width: 1080px; margin: 0 auto; }
 
-  h1, h2, h3 {
+  h1, h2, h3, .display {
     font-family: 'Rajdhani', sans-serif;
     font-weight: 700;
     letter-spacing: 0.02em;
@@ -90,15 +90,22 @@
     margin-bottom: 20px;
   }
 
-  .toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 16px;
-    flex-wrap: wrap;
+  .config-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr auto;
     gap: 10px;
+    margin-top: 12px;
   }
-  .toolbar-actions { display: flex; gap: 8px; }
+  input, select {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    width: 100%;
+  }
   button {
     background: var(--gold);
     color: #241C08;
@@ -118,9 +125,20 @@
     color: var(--text-muted);
     border: 1px solid var(--border);
   }
+  .hint { font-size: 12px; color: var(--text-faint); margin-top: 8px; }
 
-  .table-scroll { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; min-width: 600px; }
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .toolbar-actions { display: flex; gap: 8px; }
+  .toolbar-actions button { padding: 8px 14px; font-size: 12px; }
+
+  table { width: 100%; border-collapse: collapse; }
   thead th {
     text-align: left;
     font-family: 'JetBrains Mono', monospace;
@@ -128,14 +146,19 @@
     color: var(--text-faint);
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    padding: 10px;
+    padding: 0 10px 10px;
     border-bottom: 1px solid var(--border);
     cursor: pointer;
     user-select: none;
   }
   thead th:hover { color: var(--text); }
   thead th.day-col { text-align: center; }
-  thead th.num-col { text-align: center; width: 40px; cursor: default; }
+  thead th.num-col { 
+    text-align: center; 
+    width: 40px;
+    cursor: default;
+  }
+  thead th.num-col:hover { color: var(--text-faint); }
   
   tbody td {
     padding: 10px;
@@ -148,6 +171,7 @@
     font-family: 'JetBrains Mono', monospace;
     font-size: 12px;
     color: var(--text-faint);
+    width: 40px;
   }
   
   .member-name { font-weight: 500; font-size: 14px; }
@@ -155,24 +179,58 @@
 
   .shield-cell { text-align: center; }
   .shield { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
+  .shield svg { display: block; }
   .shield-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-faint); }
 
   .empty-state {
     text-align: center;
-    padding: 30px 20px;
+    padding: 40px 20px;
     color: var(--text-faint);
     font-size: 13px;
   }
 
-  .promo-section { margin-bottom: 20px; }
-  .promo-section h3 { display: flex; align-items: center; gap: 12px; }
-  .badge-count {
+  .promo-section {
+    margin-bottom: 20px;
+  }
+  .promo-section:last-child { margin-bottom: 0; }
+  .promo-section h3 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .promo-section h3 .badge-count {
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
     background: var(--surface-2);
     padding: 2px 10px;
     border-radius: 999px;
     color: var(--text-muted);
+  }
+  .promo-table-wrap {
+    overflow-x: auto;
+  }
+  .promo-table-wrap table {
+    font-size: 13px;
+  }
+  .promo-table-wrap table th {
+    font-size: 10px;
+    padding: 6px 10px;
+  }
+  .promo-table-wrap table td {
+    padding: 6px 10px;
+  }
+  .promo-table-wrap table td:first-child {
+    font-weight: 500;
+  }
+  .promo-table-wrap table td.num-col {
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-faint);
+    width: 35px;
+  }
+  .promo-badge-cell {
+    text-align: center;
   }
   .badge {
     font-family: 'JetBrains Mono', monospace;
@@ -187,9 +245,23 @@
   .badge.promote-elder { background: rgba(62,207,142,0.16); color: var(--success); border: 1px solid rgba(62,207,142,0.3); }
   .badge.promote-coleader { background: rgba(79,124,255,0.16); color: var(--blue); border: 1px solid rgba(79,124,255,0.3); }
 
+  .track-label { font-size: 11px; color: var(--text-faint); font-family: 'JetBrains Mono', monospace; margin-bottom: 6px; display: flex; justify-content: space-between; }
+  .track { height: 6px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+  .track-fill { height: 100%; border-radius: 999px; background: var(--text-faint); }
+  .track-fill.ok { background: var(--gold); }
+
   .ref-note { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-faint); margin-top: 14px; }
-  .sort-indicator { font-size: 10px; margin-left: 4px; }
-  .promo-rank { font-size: 10px; color: var(--text-faint); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; }
+
+  .sort-indicator {
+    font-size: 10px;
+    margin-left: 4px;
+  }
+  .promo-rank {
+    font-size: 10px;
+    color: var(--text-faint);
+    font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase;
+  }
 </style>
 </head>
 <body>
@@ -197,34 +269,44 @@
 
   <header>
     <div>
-      <div class="eyebrow" id="clanLabel">Carregando Clã...</div>
+      <div class="eyebrow" id="clanLabel">Nenhum clã conectado</div>
       <h1>Clash Clan Tracker</h1>
     </div>
     <div class="status-pill">
       <span class="dot" id="statusDot"></span>
-      <span id="statusText">Conectando...</span>
+      <span id="statusText">Sem conexão</span>
     </div>
   </header>
+
+  <div class="panel">
+    <h2>Conexão</h2>
+    <div class="config-grid">
+      <input id="apiUrl" readonly style="opacity: 0.6; cursor: not-allowed;" value="https://clash-tracker-six.vercel.app" />
+      <select id="clanSelect"><option value="">Selecione um clã</option></select>
+      <button onclick="connect()">Conectar</button>
+    </div>
+    <p class="hint">A URL da API já está fixa. Basta selecionar um clã e conectar.</p>
+  </div>
 
   <div class="panel">
     <div class="toolbar">
       <h2 style="margin:0">Ataques por dia de guerra</h2>
       <div class="toolbar-actions">
-        <button class="ghost" onclick="toggleHistory()" id="historyBtn">Ver histórico completo</button>
+        <button class="ghost" onclick="toggleHistory()" id="historyBtn">Ver últimos 20 dias</button>
       </div>
     </div>
-    <div class="table-scroll" id="attackTableWrap"></div>
+    <div id="attackTableWrap"></div>
   </div>
 
   <div class="panel">
-    <h2 style="margin-bottom:14px">Promoções & Médias</h2>
+    <h2 style="margin-bottom:14px">Promoções</h2>
     
     <div id="promoElderSection" class="promo-section"></div>
     <div id="promoCoLeaderSection" class="promo-section"></div>
     
     <div style="margin-top: 24px; border-top: 1px solid var(--border); padding-top: 20px;">
       <h3 style="color: var(--text-muted); font-size: 13px;">📊 Todas as médias por membro</h3>
-      <div class="table-scroll" id="promoFullTableWrap"></div>
+      <div id="promoFullTableWrap"></div>
     </div>
     
     <div class="ref-note" id="promoRef"></div>
@@ -233,27 +315,36 @@
 </div>
 
 <script>
-const DEFAULT_API_URL = 'https://clash-tracker-six.vercel.app';
+// ============================================================
+// CLASH CLAN TRACKER - FRONTEND COMPLETO (COM ORDENAÇÃO)
+// ============================================================
+
+const API_BASE_URL = 'https://clash-tracker-six.vercel.app';
 
 const state = {
-  apiUrl: DEFAULT_API_URL,
+  apiUrl: API_BASE_URL,
   clanTag: '',
   warDays: [],
   promotions: [],
-  sortMode: 'total',
+  sortMode: 'missing',
   sortAsc: false,
   showHistory: false,
+  activeMembers: new Set(),
   promoSortMode: 'avg4w',
   promoSortAsc: false,
 };
 
-function shieldSVG(used, total) {
+function shieldSVG(used, total, size) {
+  size = size || 34;
   const pct = total > 0 ? used / total : 0;
   let color = 'var(--danger)';
   if (pct >= 1) color = 'var(--gold)';
   else if (pct > 0) color = 'var(--warning)';
-  
-  return `<svg width="30" height="30" viewBox="0 0 24 24">
+  const fillHeight = 22 * pct;
+  const clipY = 24 - fillHeight;
+  const clipId = `clip-${used}-${total}-${Math.random().toString(36).slice(2)}`;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24">
+    <defs><clipPath id="${clipId}"><rect x="0" y="${clipY}" width="24" height="${Math.max(fillHeight, 0.1)}" /></clipPath></defs>
     <path d="M12 2 L21 5 V11 C21 16.5 17 20.5 12 22 C7 20.5 3 16.5 3 11 V5 Z" fill="none" stroke="${pct===0?'var(--danger)':'var(--border)'}" stroke-width="1.5"/>
     <path d="M12 2 L21 5 V11 C21 16.5 17 20.5 12 22 C7 20.5 3 16.5 3 11 V5 Z" fill="${color}" opacity="${pct===0?0:0.85}" transform="scale(${Math.max(pct,0.001)})" transform-origin="12 22"/>
   </svg>`;
@@ -264,167 +355,211 @@ function setStatus(connected, text) {
   document.getElementById('statusText').textContent = text;
 }
 
-async function initConnection() {
-  setStatus(false, 'Conectando à API...');
-
+async function connect() {
+  state.apiUrl = API_BASE_URL;
+  
+  setStatus(false, 'Conectando…');
   try {
-    const res = await fetch(state.apiUrl + '/api/clans');
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const res = await fetch(API_BASE_URL + '/api/clans');
     const clans = await res.json();
-
-    if (clans && clans.length > 0) {
-      const clan = clans[0];
-      state.clanTag = clan.tag;
-      document.getElementById('clanLabel').textContent = clan.name || clan.tag;
-      await loadClanData(clan.tag);
-    } else {
-      setStatus(false, 'Nenhum clã encontrado.');
+    const sel = document.getElementById('clanSelect');
+    sel.innerHTML = '<option value="">Selecione um clã</option>' +
+      clans.map(c => `<option value="${c.tag}">${c.name || c.tag}</option>`).join('');
+    sel.onchange = () => loadClanData(sel.value);
+    setStatus(clans.length > 0, clans.length > 0 ? clans.length + ' clã(s) encontrado(s)' : 'Nenhum clã cadastrado ainda');
+    if (clans.length > 0) {
+      sel.value = clans[0].tag;
+      loadClanData(clans[0].tag);
     }
   } catch (err) {
-    setStatus(false, 'Erro de conexão: ' + err.message);
+    setStatus(false, 'Não foi possível conectar: ' + err.message);
   }
 }
 
 async function loadClanData(tag) {
-  setStatus(true, 'Carregando todos os membros...');
-
+  if (!tag) return;
+  state.clanTag = tag;
+  document.getElementById('clanLabel').textContent = tag;
+  setStatus(true, 'Carregando dados…');
   try {
-    const [wdRes, prRes] = await Promise.all([
-      fetch(`${state.apiUrl}/api/war-days/${encodeURIComponent(tag)}`),
-      fetch(`${state.apiUrl}/api/promotions/${encodeURIComponent(tag)}`)
+    // Timeout de 5 segundos para não travar o navegador
+    const controller1 = new AbortController();
+    const controller2 = new AbortController();
+    const timeout1 = setTimeout(() => controller1.abort(), 5000);
+    const timeout2 = setTimeout(() => controller2.abort(), 5000);
+
+    const [wd, pr] = await Promise.all([
+      fetch(state.apiUrl + '/api/war-days/' + encodeURIComponent(tag), { signal: controller1.signal }).then(r => r.json()),
+      fetch(state.apiUrl + '/api/promotions/' + encodeURIComponent(tag), { signal: controller2.signal }).then(r => r.json()),
     ]);
 
-    state.warDays = wdRes.ok ? await wdRes.json() : [];
-    state.promotions = prRes.ok ? await prRes.json() : [];
+    clearTimeout(timeout1);
+    clearTimeout(timeout2);
+
+    state.warDays = wd;
+    state.promotions = pr;
+    
+    state.activeMembers = new Set();
+    if (wd.length > 0) {
+      const lastPeriod = Math.max(...wd.map(d => d.period_index));
+      const lastWarMembers = wd.filter(d => d.period_index === lastPeriod);
+      lastWarMembers.forEach(d => state.activeMembers.add(d.member_tag));
+    }
     
     setStatus(true, 'Conectado · ' + tag);
     render();
   } catch (err) {
-    setStatus(false, 'Erro ao carregar dados do clã');
+    console.warn("Erro ao carregar dados (ou timeout):", err.message);
+    setStatus(true, 'Conectado (Aguardando dados...)');
+    renderEmpty();
   }
 }
 
+function renderEmpty() {
+  const wrap = document.getElementById('attackTableWrap');
+  wrap.innerHTML = '<div class="empty-state">⏳ Aguardando o banco de dados coletar os primeiros ataques...</div>';
+  document.getElementById('promoElderSection').innerHTML = '';
+  document.getElementById('promoCoLeaderSection').innerHTML = '';
+  document.getElementById('promoFullTableWrap').innerHTML = '<div class="empty-state">⏳ Aguardando os dados de promoções...</div>';
+  document.getElementById('promoRef').textContent = '';
+}
+
 function toggleSort(columnIndex) {
-  const key = columnIndex === -1 ? 'name' : (columnIndex === -2 ? 'total' : `day-${columnIndex}`);
-  if (state.sortMode === key) state.sortAsc = !state.sortAsc;
-  else { state.sortMode = key; state.sortAsc = false; }
+  const key = columnIndex === -1 ? 'name' : `day-${columnIndex}`;
+  if (state.sortMode === key) {
+    state.sortAsc = !state.sortAsc;
+  } else {
+    state.sortMode = key;
+    state.sortAsc = false;
+  }
   render();
 }
 
 function toggleHistory() {
   state.showHistory = !state.showHistory;
-  document.getElementById('historyBtn').textContent = state.showHistory ? 'Ver só semana atual' : 'Ver histórico completo';
+  document.getElementById('historyBtn').textContent = state.showHistory ? 'Ver só a semana atual' : 'Ver últimos 20 dias';
   render();
 }
 
 function togglePromoSort(column) {
-  if (state.promoSortMode === column) state.promoSortAsc = !state.promoSortAsc;
-  else { state.promoSortMode = column; state.promoSortAsc = false; }
+  if (state.promoSortMode === column) {
+    state.promoSortAsc = !state.promoSortAsc;
+  } else {
+    state.promoSortMode = column;
+    state.promoSortAsc = false;
+  }
   renderPromotions();
 }
 
 function renderAttackTable() {
   const wrap = document.getElementById('attackTableWrap');
-  if (!state.warDays || !state.warDays.length) {
-    wrap.innerHTML = '<div class="empty-state">Nenhum dado de ataque registrado.</div>';
+  if (!state.warDays.length) {
+    wrap.innerHTML = '<div class="empty-state">Nenhum dado de ataque ainda. Aguarde o próximo dia de guerra.</div>';
     return;
   }
 
-  // Agrupar os dias de guerra por chave única de período/dia
   const daysMap = new Map();
   state.warDays.forEach(row => {
-    const section = row.section_index ?? row.section ?? 0;
-    const period = row.period_index ?? row.period ?? 0;
-    const dayNumber = row.day_number ?? (period % 7) || 7;
-    const key = `${section}-${period}`;
-
-    if (!daysMap.has(key)) {
-      daysMap.set(key, { key, section, period, dayNumber });
-    }
+    const key = row.section_index + '-' + row.period_index;
+    if (!daysMap.has(key)) daysMap.set(key, { 
+      section: row.section_index, 
+      period: row.period_index, 
+      dayNumber: row.day_number 
+    });
   });
-
   let days = Array.from(daysMap.values()).sort((a, b) => a.period - b.period);
-
-  // Se não estiver no modo histórico completo, filtra para mostrar a última seção/semana registrada
-  if (!state.showHistory && days.length > 0) {
-    const lastSection = days[days.length - 1].section;
+  
+  if (!state.showHistory) {
+    const lastSection = days[days.length - 1]?.section;
     days = days.filter(d => d.section === lastSection);
+  } else {
+    days = days.slice(-20);
   }
 
-  // Mapear TODOS os membros independentemente de formato da API
   const membersMap = new Map();
   state.warDays.forEach(row => {
-    const tag = row.member_tag || row.player_tag || row.tag || row.member_name || 'unknown';
-    const name = row.member_name || row.player_name || row.name || tag;
-    const rank = row.member_rank || row.role || row.rank || 'membro';
-    const period = row.period_index ?? row.period ?? 0;
-    const decks = row.decks_used ?? row.decksused ?? row.attacks ?? 0;
-
-    if (!membersMap.has(tag)) {
-      membersMap.set(tag, { tag, name, rank, byPeriod: {} });
+    if (!state.activeMembers.has(row.member_tag)) return;
+    if (!membersMap.has(row.member_tag)) {
+      membersMap.set(row.member_tag, { 
+        name: row.member_name, 
+        byPeriod: {},
+        rank: row.member_rank || 'member'
+      });
     }
-    membersMap.get(tag).byPeriod[period] = decks;
+    membersMap.get(row.member_tag).byPeriod[row.period_index] = row;
   });
 
-  let members = Array.from(membersMap.values()).map(m => {
-    const dayValues = days.map(d => m.byPeriod[d.period] ?? null);
-    const validDays = dayValues.filter(v => v !== null);
-    const total = validDays.reduce((a, b) => a + b, 0);
-    const maxTotal = validDays.length * 4;
-    return { ...m, dayValues, total, maxTotal };
+  let members = Array.from(membersMap.entries()).map(([tag, m]) => {
+    const total = days.reduce((sum, d) => sum + (m.byPeriod[d.period]?.decks_used ?? 0), 0);
+    const maxTotal = days.length * 4;
+    return { 
+      tag, 
+      name: m.name, 
+      rank: m.rank,
+      byPeriod: m.byPeriod, 
+      total, 
+      maxTotal,
+      dayValues: days.map(d => m.byPeriod[d.period]?.decks_used ?? -1)
+    };
   });
 
-  // Ordenação
+  const sortMode = state.sortMode;
+  const sortAsc = state.sortAsc;
+  
   members.sort((a, b) => {
     let cmp = 0;
-    if (state.sortMode === 'name') cmp = a.name.localeCompare(b.name);
-    else if (state.sortMode === 'total') cmp = a.total - b.total;
-    else if (state.sortMode.startsWith('day-')) {
-      const idx = parseInt(state.sortMode.split('-')[1]);
-      cmp = (a.dayValues[idx] ?? -1) - (b.dayValues[idx] ?? -1);
+    if (sortMode === 'name') {
+      cmp = a.name.localeCompare(b.name);
+    } else if (sortMode.startsWith('day-')) {
+      const dayIdx = parseInt(sortMode.split('-')[1]);
+      const aVal = a.dayValues[dayIdx] ?? -1;
+      const bVal = b.dayValues[dayIdx] ?? -1;
+      cmp = aVal - bVal;
+    } else {
+      cmp = a.total - b.total;
     }
-    return state.sortAsc ? cmp : -cmp;
+    return sortAsc ? cmp : -cmp;
   });
 
-  const getSortInd = (key) => state.sortMode === key ? `<span class="sort-indicator">${state.sortAsc ? '▲' : '▼'}</span>` : '';
+  const getSortIndicator = (columnKey) => {
+    if (state.sortMode === columnKey) {
+      return `<span class="sort-indicator">${state.sortAsc ? '▲' : '▼'}</span>`;
+    }
+    return '';
+  };
 
-  const headerCells = days.map((d, idx) => `
-    <th class="day-col" onclick="toggleSort(${idx})">
-      Dia ${d.dayNumber}<br><span style="opacity:.5;font-size:9px">${d.section}-${d.period}</span>
-      ${getSortInd(`day-${idx}`)}
+  const headerCells = days.map((d, idx) => 
+    `<th class="day-col" onclick="toggleSort(${idx})">
+      Dia ${d.dayNumber}<br><span style="opacity:.6">${d.section}-${d.period}</span>
+      ${getSortIndicator(`day-${idx}`)}
+    </th>`
+  ).join('');
+
+  const header = `<tr>
+    <th class="num-col">#</th>
+    <th onclick="toggleSort(-1)">
+      Membro ${getSortIndicator('name')}
     </th>
+    ${headerCells}
+  </tr>`;
+
+  const rows = members.map((m, index) => `
+    <tr>
+      <td class="num-col">${index + 1}</td>
+      <td>
+        <div class="member-name">${m.name}</div>
+        <div class="member-total">${m.total}/${m.maxTotal} ataques</div>
+      </td>
+      ${days.map((d, idx) => {
+        const r = m.byPeriod[d.period];
+        const used = r ? r.decks_used : null;
+        if (used === null) return '<td class="shield-cell"><span style="color:var(--text-faint);font-size:11px">—</span></td>';
+        return `<td class="shield-cell"><span class="shield">${shieldSVG(used, 4)}<span class="shield-label">${used}/4</span></span></td>`;
+      }).join('')}
+    </tr>
   `).join('');
 
-  const tableHTML = `<table>
-    <thead>
-      <tr>
-        <th class="num-col">#</th>
-        <th onclick="toggleSort(-1)">Membro (${members.length}) ${getSortInd('name')}</th>
-        <th onclick="toggleSort(-2)">Total ${getSortInd('total')}</th>
-        ${headerCells}
-      </tr>
-    </thead>
-    <tbody>
-      ${members.map((m, i) => `
-        <tr>
-          <td class="num-col">${i + 1}</td>
-          <td>
-            <div class="member-name">${m.name}</div>
-            <div class="promo-rank">${m.rank}</div>
-          </td>
-          <td>
-            <div class="member-total" style="font-weight:600;color:var(--text);">${m.total}/${m.maxTotal}</div>
-          </td>
-          ${m.dayValues.map(used => {
-            if (used === null) return '<td class="shield-cell"><span style="color:var(--text-faint);">—</span></td>';
-            return `<td class="shield-cell"><span class="shield">${shieldSVG(used, 4)}<span class="shield-label">${used}/4</span></span></td>`;
-          }).join('')}
-        </tr>
-      `).join('')}
-    </tbody>
-  </table>`;
-
-  wrap.innerHTML = tableHTML;
+  wrap.innerHTML = `<table><thead>${header}</thead><tbody>${rows}</tbody></table>`;
 }
 
 function renderPromotions() {
@@ -433,127 +568,191 @@ function renderPromotions() {
   const fullTableWrap = document.getElementById('promoFullTableWrap');
   const ref = document.getElementById('promoRef');
 
-  let list = [];
-
-  if (state.promotions && state.promotions.length > 0) {
-    const latestRun = state.promotions[0].calculated_at;
-    list = state.promotions.filter(p => p.calculated_at === latestRun).map(p => ({
-      member_name: p.member_name || p.player_name || 'Membro',
-      member_rank: p.member_rank || p.role || 'membro',
-      avg4w: Number(p.avg_4w || p.media_4_guerra || 0),
-      avg8w: Number(p.avg_8w || p.media_8_guerra || 0)
-    }));
-  } else if (state.warDays && state.warDays.length > 0) {
-    const membersMap = new Map();
-    state.warDays.forEach(row => {
-      const tag = row.member_tag || row.player_tag || row.tag || row.member_name;
-      const name = row.member_name || row.player_name || row.name || tag;
-      const rank = row.member_rank || row.role || 'membro';
-      const fame = row.fame ?? row.player_total_fame ?? 0;
-
-      if (!membersMap.has(tag)) {
-        membersMap.set(tag, { name, rank, scores: [] });
-      }
-      membersMap.get(tag).scores.push(fame);
-    });
-
-    membersMap.forEach((data) => {
-      const s = data.scores;
-      const avg4w = s.length ? (s.slice(-4).reduce((a,b)=>a+b,0) / Math.min(s.length, 4)) : 0;
-      const avg8w = s.length ? (s.slice(-8).reduce((a,b)=>a+b,0) / Math.min(s.length, 8)) : 0;
-      list.push({ member_name: data.name, member_rank: data.rank, avg4w, avg8w });
-    });
-  }
-
-  if (!list.length) {
+  if (!state.promotions.length) {
     elderSection.innerHTML = '';
     coLeaderSection.innerHTML = '';
-    fullTableWrap.innerHTML = '<div class="empty-state">Sem dados para médias de promoção.</div>';
+    fullTableWrap.innerHTML = '<div class="empty-state">Nenhum cálculo de promoção ainda. Ele roda toda segunda de manhã, após o fechamento da guerra.</div>';
     ref.textContent = '';
     return;
   }
 
-  const elders = list.filter(p => (p.member_rank === 'member' || p.member_rank === 'membro') && p.avg4w >= 2500);
-  const coLeaders = list.filter(p => (p.member_rank === 'elder' || p.member_rank === 'anciã' || p.member_rank === 'anciao') && p.avg8w >= 2500);
+  // CORREÇÃO DO LIMITE OCULTO
+  const uniqueDates = [...new Set(state.promotions.map(p => p.calculated_at))].sort().reverse();
+  const latestRun = uniqueDates[0];
 
-  elderSection.innerHTML = `
-    <h3>⭐ Promover a Ancião <span class="badge-count">${elders.length}</span></h3>
-    ${elders.length ? `
-      <table>
-        <thead><tr><th class="num-col">#</th><th>Membro</th><th>Cargo</th><th style="text-align:center;">Média 4 Semanas</th><th style="text-align:center;">Ação</th></tr></thead>
-        <tbody>${elders.map((p, i) => `
-          <tr>
-            <td class="num-col">${i+1}</td>
-            <td><strong>${p.member_name}</strong></td>
-            <td><span class="promo-rank">${p.member_rank}</span></td>
-            <td style="text-align:center;font-family:'JetBrains Mono';">${Math.round(p.avg4w)} pts</td>
-            <td style="text-align:center;"><span class="badge promote-elder">Promover Ancião</span></td>
-          </tr>`).join('')}
-        </tbody>
-      </table>` : '<div class="empty-state" style="padding:10px;">Nenhum membro elegível no momento.</div>'}
-  `;
+  let latest = state.promotions.filter(p => p.calculated_at === latestRun);
+  latest = latest.filter(p => state.activeMembers.has(p.member_tag));
+  
+  const refSection = latest[0]?.reference_section_index;
 
-  coLeaderSection.innerHTML = `
-    <h3>👑 Promover a Colíder <span class="badge-count">${coLeaders.length}</span></h3>
-    ${coLeaders.length ? `
-      <table>
-        <thead><tr><th class="num-col">#</th><th>Membro</th><th>Cargo</th><th style="text-align:center;">Média 8 Semanas</th><th style="text-align:center;">Ação</th></tr></thead>
-        <tbody>${coLeaders.map((p, i) => `
-          <tr>
-            <td class="num-col">${i+1}</td>
-            <td><strong>${p.member_name}</strong></td>
-            <td><span class="promo-rank">${p.member_rank}</span></td>
-            <td style="text-align:center;font-family:'JetBrains Mono';">${Math.round(p.avg8w)} pts</td>
-            <td style="text-align:center;"><span class="badge promote-coleader">Promover Colíder</span></td>
-          </tr>`).join('')}
-        </tbody>
-      </table>` : '<div class="empty-state" style="padding:10px;">Nenhum ancião elegível no momento.</div>'}
-  `;
+  if (latest.length === 0) {
+    elderSection.innerHTML = '';
+    coLeaderSection.innerHTML = '';
+    fullTableWrap.innerHTML = '<div class="empty-state">Nenhum membro ativo encontrado.</div>';
+    ref.textContent = '';
+    return;
+  }
 
-  list.sort((a, b) => {
-    let cmp = 0;
-    if (state.promoSortMode === 'name') cmp = a.member_name.localeCompare(b.member_name);
-    else if (state.promoSortMode === 'avg4w') cmp = a.avg4w - b.avg4w;
-    else if (state.promoSortMode === 'avg8w') cmp = a.avg8w - b.avg8w;
-    return state.promoSortAsc ? cmp : -cmp;
+  const promoteToElder = [];
+  const promoteToCoLeader = [];
+  const allMembers = [];
+
+  latest.forEach(p => {
+    const rank = (p.member_rank || 'member').toLowerCase();
+    const avg4w = p.avg_4w || 0;
+    const avg8w = p.avg_8w || 0;
+    
+    allMembers.push({ ...p, rank, avg4w, avg8w });
+    
+    if (rank === 'member' && avg4w >= 2500) {
+      promoteToElder.push({ ...p, avg4w, avg8w });
+    }
+    if (rank === 'elder' && avg8w >= 2500) {
+      promoteToCoLeader.push({ ...p, avg4w, avg8w });
+    }
   });
 
-  const getInd = (col) => state.promoSortMode === col ? `<span class="sort-indicator">${state.promoSortAsc ? '▲' : '▼'}</span>` : '';
+  if (promoteToElder.length > 0) {
+    elderSection.innerHTML = `
+      <h3>
+        ⭐ Promover a Ancião
+        <span class="badge-count">${promoteToElder.length} membro${promoteToElder.length > 1 ? 's' : ''}</span>
+      </h3>
+      <div class="promo-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="num-col">#</th>
+              <th>Membro</th>
+              <th>Cargo atual</th>
+              <th style="text-align:center;">Média 4 semanas</th>
+              <th style="text-align:center;">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${promoteToElder.map((p, index) => `
+              <tr>
+                <td class="num-col">${index + 1}</td>
+                <td>${p.member_name}</td>
+                <td><span class="promo-rank">${p.member_rank || 'membro'}</span></td>
+                <td style="text-align:center; font-family:'JetBrains Mono',monospace;">${Math.round(p.avg4w)}</td>
+                <td class="promo-badge-cell"><span class="badge promote-elder">✅ Promover a Ancião</span></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } else {
+    elderSection.innerHTML = `
+      <h3>⭐ Promover a Ancião</h3>
+      <div class="empty-state" style="padding:12px; font-size:12px;">Nenhum membro elegível para promoção a Ancião no momento.</div>
+    `;
+  }
+
+  if (promoteToCoLeader.length > 0) {
+    coLeaderSection.innerHTML = `
+      <h3>
+        👑 Promover a Colíder
+        <span class="badge-count">${promoteToCoLeader.length} membro${promoteToCoLeader.length > 1 ? 's' : ''}</span>
+      </h3>
+      <div class="promo-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="num-col">#</th>
+              <th>Membro</th>
+              <th>Cargo atual</th>
+              <th style="text-align:center;">Média 8 semanas</th>
+              <th style="text-align:center;">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${promoteToCoLeader.map((p, index) => `
+              <tr>
+                <td class="num-col">${index + 1}</td>
+                <td>${p.member_name}</td>
+                <td><span class="promo-rank">${p.member_rank || 'membro'}</span></td>
+                <td style="text-align:center; font-family:'JetBrains Mono',monospace;">${Math.round(p.avg8w)}</td>
+                <td class="promo-badge-cell"><span class="badge promote-coleader">✅ Promover a Colíder</span></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } else {
+    coLeaderSection.innerHTML = `
+      <h3>👑 Promover a Colíder</h3>
+      <div class="empty-state" style="padding:12px; font-size:12px;">Nenhum membro elegível para promoção a Colíder no momento.</div>
+    `;
+  }
+
+  const promoSortMode = state.promoSortMode;
+  const promoSortAsc = state.promoSortAsc;
+  
+  allMembers.sort((a, b) => {
+    let cmp = 0;
+    if (promoSortMode === 'name') {
+      cmp = a.member_name.localeCompare(b.member_name);
+    } else if (promoSortMode === 'avg4w') {
+      cmp = a.avg4w - b.avg4w;
+    } else if (promoSortMode === 'avg8w') {
+      cmp = a.avg8w - b.avg8w;
+    }
+    return promoSortAsc ? cmp : -cmp;
+  });
+
+  const getPromoSortIndicator = (column) => {
+    if (state.promoSortMode === column) {
+      return `<span class="sort-indicator">${state.promoSortAsc ? '▲' : '▼'}</span>`;
+    }
+    return '';
+  };
 
   fullTableWrap.innerHTML = `
-    <table>
-      <thead>
-        <tr>
-          <th class="num-col">#</th>
-          <th onclick="togglePromoSort('name')">Membro ${getInd('name')}</th>
-          <th>Cargo</th>
-          <th style="text-align:center;" onclick="togglePromoSort('avg4w')">Média 4 Sem. ${getInd('avg4w')}</th>
-          <th style="text-align:center;" onclick="togglePromoSort('avg8w')">Média 8 Sem. ${getInd('avg8w')}</th>
-          <th style="text-align:center;">Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${list.map((p, i) => {
-          let status = '—';
-          if ((p.member_rank === 'member' || p.member_rank === 'membro') && p.avg4w >= 2500) status = '<span class="badge eligible">Ancião</span>';
-          else if ((p.member_rank === 'elder' || p.member_rank === 'anciao') && p.avg8w >= 2500) status = '<span class="badge eligible">Colíder</span>';
-          
-          return `
-            <tr>
-              <td class="num-col">${i+1}</td>
-              <td>${p.member_name}</td>
-              <td><span class="promo-rank">${p.member_rank}</span></td>
-              <td style="text-align:center;font-family:'JetBrains Mono';">${Math.round(p.avg4w)}</td>
-              <td style="text-align:center;font-family:'JetBrains Mono';">${Math.round(p.avg8w)}</td>
-              <td style="text-align:center;">${status}</td>
-            </tr>
-          `;
-        }).join('')}
-      </tbody>
-    </table>
+    <div class="promo-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="num-col">#</th>
+            <th onclick="togglePromoSort('name')">Membro ${getPromoSortIndicator('name')}</th>
+            <th>Cargo</th>
+            <th onclick="togglePromoSort('avg4w')" style="text-align:center; cursor:pointer;">Média 4 semanas ${getPromoSortIndicator('avg4w')}</th>
+            <th onclick="togglePromoSort('avg8w')" style="text-align:center; cursor:pointer;">Média 8 semanas ${getPromoSortIndicator('avg8w')}</th>
+            <th style="text-align:center;">Elegível</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${allMembers.map((p, index) => {
+            const rank = p.rank;
+            const avg4w = p.avg4w;
+            const avg8w = p.avg8w;
+            
+            let elegivel = '';
+            if (rank === 'member' && avg4w >= 2500) elegivel = 'Ancião';
+            else if (rank === 'elder' && avg8w >= 2500) elegivel = 'Colíder';
+            else elegivel = '—';
+            
+            return `
+              <tr>
+                <td class="num-col">${index + 1}</td>
+                <td>${p.member_name}</td>
+                <td><span class="promo-rank">${p.member_rank || 'membro'}</span></td>
+                <td style="text-align:center; font-family:'JetBrains Mono',monospace;">${Math.round(avg4w)}</td>
+                <td style="text-align:center; font-family:'JetBrains Mono',monospace;">${Math.round(avg8w)}</td>
+                <td style="text-align:center;">
+                  ${elegivel !== '—' ? `<span class="badge eligible">${elegivel}</span>` : '—'}
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
   `;
 
-  ref.textContent = `Total de membros analisados: ${list.length}`;
+  ref.textContent = `Referente à guerra ${refSection} · calculado em ${new Date(latestRun).toLocaleString('pt-BR')}`;
 }
 
 function render() {
@@ -561,8 +760,10 @@ function render() {
   renderPromotions();
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-  initConnection();
+// ---- Inicialização ----
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("Iniciando aplicação...");
+    connect();
 });
 </script>
 </body>
