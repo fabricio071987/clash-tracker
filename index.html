@@ -568,188 +568,85 @@ function renderPromotions() {
   const fullTableWrap = document.getElementById('promoFullTableWrap');
   const ref = document.getElementById('promoRef');
 
+  // Se não tiver NENHUM dado de promoção no banco ainda
   if (!state.promotions.length) {
     elderSection.innerHTML = '';
     coLeaderSection.innerHTML = '';
-    fullTableWrap.innerHTML = '<div class="empty-state">Nenhum cálculo de promoção ainda. Ele roda toda segunda de manhã, após o fechamento da guerra.</div>';
+    fullTableWrap.innerHTML = '<div class="empty-state">Nenhum cálculo de promoção ainda. O bot roda automaticamente quando há guerra.</div>';
     ref.textContent = '';
     return;
   }
 
-  // CORREÇÃO DO LIMITE OCULTO
+  // Pega os dados MAIS RECENTES
   const uniqueDates = [...new Set(state.promotions.map(p => p.calculated_at))].sort().reverse();
   const latestRun = uniqueDates[0];
-
-  let latest = state.promotions.filter(p => p.calculated_at === latestRun);
-  latest = latest.filter(p => state.activeMembers.has(p.member_tag));
+  let latest = state.promotions.filter(p => p.calculated_at === latestRun && state.activeMembers.has(p.member_tag));
   
-  const refSection = latest[0]?.reference_section_index;
+  const refSection = latest[0]?.reference_section_index || 'Desconhecida';
 
-  if (latest.length === 0) {
-    elderSection.innerHTML = '';
-    coLeaderSection.innerHTML = '';
-    fullTableWrap.innerHTML = '<div class="empty-state">Nenhum membro ativo encontrado.</div>';
-    ref.textContent = '';
-    return;
-  }
+  // SEÇÃO DE "QUEM PODE SER PROMOVIDO"
+  const promoteToElder = latest.filter(p => (p.member_rank || 'member').toLowerCase() === 'member' && (p.avg_4w || 0) >= 2500);
+  const promoteToCoLeader = latest.filter(p => (p.member_rank || 'member').toLowerCase() === 'elder' && (p.avg_8w || 0) >= 2500);
 
-  const promoteToElder = [];
-  const promoteToCoLeader = [];
-  const allMembers = [];
-
-  latest.forEach(p => {
-    const rank = (p.member_rank || 'member').toLowerCase();
-    const avg4w = p.avg_4w || 0;
-    const avg8w = p.avg_8w || 0;
-    
-    allMembers.push({ ...p, rank, avg4w, avg8w });
-    
-    if (rank === 'member' && avg4w >= 2500) {
-      promoteToElder.push({ ...p, avg4w, avg8w });
-    }
-    if (rank === 'elder' && avg8w >= 2500) {
-      promoteToCoLeader.push({ ...p, avg4w, avg8w });
-    }
-  });
-
+  // Renderiza a seção de Ancião (só aparece se tiver alguém elegível)
   if (promoteToElder.length > 0) {
     elderSection.innerHTML = `
-      <h3>
-        ⭐ Promover a Ancião
-        <span class="badge-count">${promoteToElder.length} membro${promoteToElder.length > 1 ? 's' : ''}</span>
-      </h3>
-      <div class="promo-table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th class="num-col">#</th>
-              <th>Membro</th>
-              <th>Cargo atual</th>
-              <th style="text-align:center;">Média 4 semanas</th>
-              <th style="text-align:center;">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${promoteToElder.map((p, index) => `
-              <tr>
-                <td class="num-col">${index + 1}</td>
-                <td>${p.member_name}</td>
-                <td><span class="promo-rank">${p.member_rank || 'membro'}</span></td>
-                <td style="text-align:center; font-family:'JetBrains Mono',monospace;">${Math.round(p.avg4w)}</td>
-                <td class="promo-badge-cell"><span class="badge promote-elder">✅ Promover a Ancião</span></td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
+      <h3>⭐ Promover a Ancião <span class="badge-count">${promoteToElder.length}</span></h3>
+      <div class="promo-table-wrap"><table>
+        <thead><tr><th>#</th><th>Membro</th><th>Cargo</th><th style="text-align:center;">Média 4s</th></tr></thead>
+        <tbody>${promoteToElder.map((p, i) => `<tr><td class="num-col">${i+1}</td><td>${p.member_name}</td><td><span class="promo-rank">${p.member_rank || 'membro'}</span></td><td style="text-align:center;font-family:monospace;">${Math.round(p.avg_4w || 0)}</td></tr>`).join('')}</tbody>
+      </table></div>
     `;
   } else {
-    elderSection.innerHTML = `
-      <h3>⭐ Promover a Ancião</h3>
-      <div class="empty-state" style="padding:12px; font-size:12px;">Nenhum membro elegível para promoção a Ancião no momento.</div>
-    `;
+    elderSection.innerHTML = `<h3>⭐ Promover a Ancião</h3><div class="empty-state" style="padding:12px; font-size:12px;">Nenhum membro elegível (média 4 semanas abaixo de 2500).</div>`;
   }
 
+  // Renderiza a seção de Colíder (só aparece se tiver alguém elegível)
   if (promoteToCoLeader.length > 0) {
     coLeaderSection.innerHTML = `
-      <h3>
-        👑 Promover a Colíder
-        <span class="badge-count">${promoteToCoLeader.length} membro${promoteToCoLeader.length > 1 ? 's' : ''}</span>
-      </h3>
-      <div class="promo-table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th class="num-col">#</th>
-              <th>Membro</th>
-              <th>Cargo atual</th>
-              <th style="text-align:center;">Média 8 semanas</th>
-              <th style="text-align:center;">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${promoteToCoLeader.map((p, index) => `
-              <tr>
-                <td class="num-col">${index + 1}</td>
-                <td>${p.member_name}</td>
-                <td><span class="promo-rank">${p.member_rank || 'membro'}</span></td>
-                <td style="text-align:center; font-family:'JetBrains Mono',monospace;">${Math.round(p.avg8w)}</td>
-                <td class="promo-badge-cell"><span class="badge promote-coleader">✅ Promover a Colíder</span></td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
+      <h3>👑 Promover a Colíder <span class="badge-count">${promoteToCoLeader.length}</span></h3>
+      <div class="promo-table-wrap"><table>
+        <thead><tr><th>#</th><th>Membro</th><th>Cargo</th><th style="text-align:center;">Média 8s</th></tr></thead>
+        <tbody>${promoteToCoLeader.map((p, i) => `<tr><td class="num-col">${i+1}</td><td>${p.member_name}</td><td><span class="promo-rank">${p.member_rank || 'membro'}</span></td><td style="text-align:center;font-family:monospace;">${Math.round(p.avg_8w || 0)}</td></tr>`).join('')}</tbody>
+      </table></div>
     `;
   } else {
-    coLeaderSection.innerHTML = `
-      <h3>👑 Promover a Colíder</h3>
-      <div class="empty-state" style="padding:12px; font-size:12px;">Nenhum membro elegível para promoção a Colíder no momento.</div>
-    `;
+    coLeaderSection.innerHTML = `<h3>👑 Promover a Colíder</h3><div class="empty-state" style="padding:12px; font-size:12px;">Nenhum membro elegível (média 8 semanas abaixo de 2500).</div>`;
   }
 
-  const promoSortMode = state.promoSortMode;
-  const promoSortAsc = state.promoSortAsc;
-  
-  allMembers.sort((a, b) => {
-    let cmp = 0;
-    if (promoSortMode === 'name') {
-      cmp = a.member_name.localeCompare(b.member_name);
-    } else if (promoSortMode === 'avg4w') {
-      cmp = a.avg4w - b.avg4w;
-    } else if (promoSortMode === 'avg8w') {
-      cmp = a.avg8w - b.avg8w;
-    }
-    return promoSortAsc ? cmp : -cmp;
-  });
-
-  const getPromoSortIndicator = (column) => {
-    if (state.promoSortMode === column) {
-      return `<span class="sort-indicator">${state.promoSortAsc ? '▲' : '▼'}</span>`;
-    }
-    return '';
-  };
+  // --- A CORREÇÃO QUE VAI MOSTRAR A TABELA MESMO COM MÉDIAS BAIXAS ---
+  // Tabela Geral com TODOS os membros (ordena por média 4 semanas)
+  const allMembers = latest.sort((a, b) => (b.avg_4w || 0) - (a.avg_4w || 0));
 
   fullTableWrap.innerHTML = `
-    <div class="promo-table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th class="num-col">#</th>
-            <th onclick="togglePromoSort('name')">Membro ${getPromoSortIndicator('name')}</th>
-            <th>Cargo</th>
-            <th onclick="togglePromoSort('avg4w')" style="text-align:center; cursor:pointer;">Média 4 semanas ${getPromoSortIndicator('avg4w')}</th>
-            <th onclick="togglePromoSort('avg8w')" style="text-align:center; cursor:pointer;">Média 8 semanas ${getPromoSortIndicator('avg8w')}</th>
-            <th style="text-align:center;">Elegível</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${allMembers.map((p, index) => {
-            const rank = p.rank;
-            const avg4w = p.avg4w;
-            const avg8w = p.avg8w;
-            
-            let elegivel = '';
-            if (rank === 'member' && avg4w >= 2500) elegivel = 'Ancião';
-            else if (rank === 'elder' && avg8w >= 2500) elegivel = 'Colíder';
-            else elegivel = '—';
-            
-            return `
-              <tr>
-                <td class="num-col">${index + 1}</td>
-                <td>${p.member_name}</td>
-                <td><span class="promo-rank">${p.member_rank || 'membro'}</span></td>
-                <td style="text-align:center; font-family:'JetBrains Mono',monospace;">${Math.round(avg4w)}</td>
-                <td style="text-align:center; font-family:'JetBrains Mono',monospace;">${Math.round(avg8w)}</td>
-                <td style="text-align:center;">
-                  ${elegivel !== '—' ? `<span class="badge eligible">${elegivel}</span>` : '—'}
-                </td>
-              </tr>
-            `;
-          }).join('')}
-        </tbody>
-      </table>
-    </div>
+    <div class="promo-table-wrap"><table>
+      <thead>
+        <tr>
+          <th class="num-col">#</th><th>Membro</th><th>Cargo</th>
+          <th style="text-align:center;">Média 4s</th><th style="text-align:center;">Média 8s</th><th style="text-align:center;">Elegível</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${allMembers.map((p, i) => {
+          const rank = (p.member_rank || 'member').toLowerCase();
+          const avg4 = p.avg_4w || 0;
+          const avg8 = p.avg_8w || 0;
+          let elegivel = '—';
+          if (rank === 'member' && avg4 >= 2500) elegivel = 'Ancião';
+          else if (rank === 'elder' && avg8 >= 2500) elegivel = 'Colíder';
+          return `
+            <tr>
+              <td class="num-col">${i+1}</td>
+              <td><strong>${p.member_name}</strong></td>
+              <td><span class="promo-rank">${p.member_rank || 'membro'}</span></td>
+              <td style="text-align:center;font-family:monospace;">${Math.round(avg4)}</td>
+              <td style="text-align:center;font-family:monospace;">${Math.round(avg8)}</td>
+              <td style="text-align:center;">${elegivel !== '—' ? `<span class="badge eligible">${elegivel}</span>` : '—'}</td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table></div>
   `;
 
   ref.textContent = `Referente à guerra ${refSection} · calculado em ${new Date(latestRun).toLocaleString('pt-BR')}`;
