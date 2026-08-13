@@ -8,7 +8,7 @@ const turso = createClient({
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  
+
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -24,11 +24,11 @@ export default async function handler(req, res) {
     const result = await Promise.race([
       turso.execute({
         sql: `
-          SELECT member_name, period_index, decks_used, decks_total, updated_at
-          FROM war_days 
-          WHERE clan_tag = ? AND is_active = 1 
+          SELECT member_tag, member_name, member_rank, section_index, period_index, decks_used, decks_total, updated_at
+          FROM war_days
+          WHERE clan_tag = ? AND is_active = 1
           ORDER BY period_index DESC, member_name ASC
-          LIMIT 200
+          LIMIT 2000
         `,
         args: [decodedTag]
       }),
