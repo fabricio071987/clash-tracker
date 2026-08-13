@@ -382,11 +382,11 @@ async function loadClanData(tag) {
   document.getElementById('clanLabel').textContent = tag;
   setStatus(true, 'Carregando dados…');
   try {
-    // Timeout de 5 segundos para não travar o navegador
+    // Timeout de 25 segundos (o banco Turso pode demorar um pouco para responder)
     const controller1 = new AbortController();
     const controller2 = new AbortController();
-    const timeout1 = setTimeout(() => controller1.abort(), 5000);
-    const timeout2 = setTimeout(() => controller2.abort(), 5000);
+    const timeout1 = setTimeout(() => controller1.abort(), 25000);
+    const timeout2 = setTimeout(() => controller2.abort(), 25000);
 
     const [wd, pr] = await Promise.all([
       fetch(state.apiUrl + '/api/war-days/' + encodeURIComponent(tag), { signal: controller1.signal }).then(r => r.json()),
@@ -399,12 +399,23 @@ async function loadClanData(tag) {
     state.warDays = wd;
     state.promotions = pr;
     
+    // Membros ativos da última guerra (por tag; fallback por nome caso a tag venha vazia)
     state.activeMembers = new Set();
+    state.activeMembersByName = new Set();
     if (wd.length > 0) {
       const lastPeriod = Math.max(...wd.map(d => d.period_index));
       const lastWarMembers = wd.filter(d => d.period_index === lastPeriod);
-      lastWarMembers.forEach(d => state.activeMembers.add(d.member_tag));
+      lastWarMembers.forEach(d => {
+        if (d.member_tag) state.activeMembers.add(d.member_tag);
+        state.activeMembersByName.add((d.member_name || '').trim().toLowerCase());
+      });
     }
+
+    function isActiveMember(p) {
+      if (p.member_tag && state.activeMembers.has(p.member_tag)) return true;
+      return state.activeMembersByName.has((p.member_name || '').trim().toLowerCase());
+    }
+    state.isActiveMember = isActiveMember;
     
     setStatus(true, 'Conectado · ' + tag);
     render();
@@ -460,11 +471,11 @@ function renderAttackTable() {
 
   const daysMap = new Map();
   state.warDays.forEach(row => {
-    const key = row.section_index + '-' + row.period_index;
+    const key = (row.section_index || 0) + '-' + row.period_index;
     if (!daysMap.has(key)) daysMap.set(key, { 
-      section: row.section_index, 
+      section: row.section_index || 0, 
       period: row.period_index, 
-      dayNumber: row.day_number 
+      dayNumber: row.period_index
     });
   });
   let days = Array.from(daysMap.values()).sort((a, b) => a.period - b.period);
@@ -476,24 +487,42 @@ function renderAttackTable() {
     days = days.slice(-20);
   }
 
+  // Agrupa por member_tag quando disponível; fallback por nome normalizado
+  function memberKey(row) {
+    return (row.member_tag && String(row.member_tag).trim() !== '')
+      ? 't:' + row.member_tag
+      : 'n:' + (row.member_name || '').trim().toLowerCase();
+  }
+
   const membersMap = new Map();
   state.warDays.forEach(row => {
-    if (!state.activeMembers.has(row.member_tag)) return;
-    if (!membersMap.has(row.member_tag)) {
-      membersMap.set(row.member_tag, { 
+    if (!state.isActiveMember(row)) return;
+    const key = memberKey(row);
+    if (!membersMap.has(key)) {
+      membersMap.set(key, { 
         name: row.member_name, 
         byPeriod: {},
         rank: row.member_rank || 'member'
       });
     }
-    membersMap.get(row.member_tag).byPeriod[row.period_index] = row;
+    const m = membersMap.get(key);
+    // Mantém o registro com a informação mais recente
+    const existing = m.byPeriod[row.period_index];
+    if (!existing || (row.updated_at || '') > (existing.updated_at || '')) {
+      m.byPeriod[row.period_index] = row;
+    }
+    if ((row.updated_at || '') > (m.lastUpdate || '')) {
+      m.name = row.member_name;
+      m.rank = row.member_rank || 'member';
+      m.lastUpdate = row.updated_at;
+    }
   });
 
-  let members = Array.from(membersMap.entries()).map(([tag, m]) => {
+  let members = Array.from(membersMap.entries()).map(([key, m]) => {
     const total = days.reduce((sum, d) => sum + (m.byPeriod[d.period]?.decks_used ?? 0), 0);
     const maxTotal = days.length * 4;
     return { 
-      tag, 
+      key,
       name: m.name, 
       rank: m.rank,
       byPeriod: m.byPeriod, 
@@ -530,7 +559,7 @@ function renderAttackTable() {
 
   const headerCells = days.map((d, idx) => 
     `<th class="day-col" onclick="toggleSort(${idx})">
-      Dia ${d.dayNumber}<br><span style="opacity:.6">${d.section}-${d.period}</span>
+      Dia ${d.dayNumber}<br><span style="opacity:.6">guerra ${d.period}</span>
       ${getSortIndicator(`day-${idx}`)}
     </th>`
   ).join('');
@@ -581,14 +610,20 @@ function renderPromotions() {
   const latestRun = uniqueDates[0];
 
   let latest = state.promotions.filter(p => p.calculated_at === latestRun);
-  latest = latest.filter(p => state.activeMembers.has(p.member_tag));
+  // Mostra os membros que participaram da última guerra (fallback por nome se a tag estiver vazia)
+  latest = latest.filter(p => state.isActiveMember(p));
+  
+  // Deduplica: se houver várias linhas para o mesmo membro, mantém a última
+  const dedup = new Map();
+  latest.forEach(p => dedup.set((p.member_name || '').trim().toLowerCase(), p));
+  latest = Array.from(dedup.values());
   
   const refSection = latest[0]?.reference_section_index;
 
   if (latest.length === 0) {
     elderSection.innerHTML = '';
     coLeaderSection.innerHTML = '';
-    fullTableWrap.innerHTML = '<div class="empty-state">Nenhum membro ativo encontrado.</div>';
+    fullTableWrap.innerHTML = '<div class="empty-state">Nenhum membro ativo encontrado na última guerra. Aguarde o próximo dia de guerra.</div>';
     ref.textContent = '';
     return;
   }
