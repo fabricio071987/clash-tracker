@@ -24,10 +24,11 @@ export default async function handler(req, res) {
     const result = await Promise.race([
       turso.execute({
         sql: `
-          SELECT member_tag, member_name, member_rank, avg_4w, avg_8w, reference_section_index, calculated_at 
-          FROM promotions 
-          WHERE clan_tag = ? AND is_active = 1 
+          SELECT member_tag, member_name, member_rank, avg_4w, avg_8w, reference_section_index, calculated_at, sum_4w, sum_8w
+          FROM promotions
+          WHERE clan_tag = ? AND is_active = 1
           ORDER BY member_name ASC
+          LIMIT 2000
         `,
         args: [decodedTag]
       }),
