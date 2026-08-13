@@ -85,14 +85,22 @@ async function calculatePromotions(clan) {
     });
 
     // MONTAGEM DOS NOVOS DADOS
+    // IMPORTANTE: a soma considera as últimas 4/8 semanas do histórico do clã.
+    // Se o membro não participou de alguma semana, ela entra como 0 fama (não é ignorada).
+    // A divisão é SEMPRE por 4 (avg_4w) e por 8 (avg_8w), independente de quantas
+    // guerras o membro participou. Assim ninguém aparece com média inflada por
+    // ter participado de poucas guerras.
     for (const [memberTag, weeksFame] of fameByMember.entries()) {
       const memberInfo = memberMap.get(memberTag);
       const last4 = weeksFame.slice(0, 4);
       const last8 = weeksFame.slice(0, 8);
+      // Preenche com 0 as semanas em que o membro não participou
+      while (last4.length < 4) last4.push(0);
+      while (last8.length < 8) last8.push(0);
       const sum4 = last4.reduce((a, b) => a + b, 0);
       const sum8 = last8.reduce((a, b) => a + b, 0);
-      const avg4 = last4.length ? sum4 / last4.length : 0;
-      const avg8 = last8.length ? sum8 / last8.length : 0;
+      const avg4 = sum4 / 4;
+      const avg8 = sum8 / 8;
 
       statements.push({
         sql: `
