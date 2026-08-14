@@ -292,7 +292,7 @@
     <div class="toolbar">
       <h2 style="margin:0">Ataques por dia de guerra</h2>
       <div class="toolbar-actions">
-        <button class="ghost" onclick="toggleHistory()" id="historyBtn">Ver últimos 20 dias</button>
+        <button class="ghost" id="historyBtn" style="display:none">Ver últimos 20 dias</button>
       </div>
     </div>
     <div id="attackTableWrap"></div>
@@ -328,7 +328,6 @@ const state = {
   promotions: [],
   sortMode: 'missing',
   sortAsc: false,
-  showHistory: false,
   activeMembers: new Set(),
   promoSortMode: 'avg4w',
   promoSortAsc: false,
@@ -446,11 +445,8 @@ function toggleSort(columnIndex) {
   render();
 }
 
-function toggleHistory() {
-  state.showHistory = !state.showHistory;
-  document.getElementById('historyBtn').textContent = state.showHistory ? 'Ver só a semana atual' : 'Ver últimos 20 dias';
-  render();
-}
+// OBS: a tabela agora é sempre fixa com as últimas 20 guerras coletadas.
+// O botão de histórico foi mantido apenas para não quebrar o layout (fica oculto).
 
 function togglePromoSort(column) {
   if (state.promoSortMode === column) {
@@ -462,6 +458,52 @@ function togglePromoSort(column) {
   renderPromotions();
 }
 
+// ============================================================
+// TABELA FIXA DE 20 GUERRAS
+// slot 0 = guerra mais recente, slot 19 = mais antiga
+// ============================================================
+const MAX_WAR_SLOTS = 20;
+
+function buildWarSlots() {
+  // Coleta as guerras conhecidas (section+period únicos), ordenadas por data de coleta mais recente
+  const warsMap = new Map();
+  state.warDays.forEach(row => {
+    const period = row.period_index;
+    const updated = row.updated_at || '';
+    if (!warsMap.has(period) || updated > warsMap.get(period)) {
+      warsMap.set(period, updated);
+    }
+  });
+  // Ordena do mais recente para o mais antigo (data de atualização)
+  const sortedWars = Array.from(warsMap.entries()).sort((a, b) => (b[1] > a[1] ? 1 : -1)).map(e => e[0]);
+  // Pega as 20 mais recentes (as 20 mais recentes ficam nos slots 0..19)
+  const last20 = sortedWars.slice(0, MAX_WAR_SLOTS);
+  // slots[0] = mais recente, slots[19] = mais antiga
+  const slots = last20.map((period, idx) => ({ slot: idx + 1, period }));
+  return slots;
+}
+
+// Determina a partir de qual slot o membro JÁ estava no clã.
+// Regra: o membro entrou no clã na primeira guerra (mais antiga) em que ele tem registro,
+// ou na guerra mais antiga existente se ele nunca participou.
+function computePresence(membersMap, slots) {
+  const presence = new Map();
+  membersMap.forEach((m, key) => {
+    let firstSlot = null; // primeiro slot (mais antigo) em que o membro apareceu
+    for (const s of slots) {
+      const r = m.byPeriod[s.period];
+      if (r) {
+        const slotIdx = MAX_WAR_SLOTS - 1 - (slots.length - s.slot); // índice 0-based descendo
+        if (firstSlot === null || s.slot > firstSlot) firstSlot = s.slot;
+      }
+    }
+    // Se o membro nunca participou de nenhuma das 20 guerras, consideramos que entrou
+    // apenas depois da guerra mais antiga conhecida: aparece a partir do slot 1 (mais recente)
+    presence.set(key, firstSlot);
+  });
+  return presence;
+}
+
 function renderAttackTable() {
   const wrap = document.getElementById('attackTableWrap');
   if (!state.warDays.length) {
@@ -469,23 +511,7 @@ function renderAttackTable() {
     return;
   }
 
-  const daysMap = new Map();
-  state.warDays.forEach(row => {
-    const key = (row.section_index || 0) + '-' + row.period_index;
-    if (!daysMap.has(key)) daysMap.set(key, { 
-      section: row.section_index || 0, 
-      period: row.period_index, 
-      dayNumber: row.period_index
-    });
-  });
-  let days = Array.from(daysMap.values()).sort((a, b) => a.period - b.period);
-  
-  if (!state.showHistory) {
-    const lastSection = days[days.length - 1]?.section;
-    days = days.filter(d => d.section === lastSection);
-  } else {
-    days = days.slice(-20);
-  }
+  const slots = buildWarSlots(); // slots fixos 1..20, slot 1 = mais recente
 
   // Agrupa por member_tag quando disponível; fallback por nome normalizado
   function memberKey(row) {
@@ -518,17 +544,34 @@ function renderAttackTable() {
     }
   });
 
+  const presence = computePresence(membersMap, slots);
+
+  // Monta os valores por slot: 1..20 (1 = mais recente) para cada membro
   let members = Array.from(membersMap.entries()).map(([key, m]) => {
-    const total = days.reduce((sum, d) => sum + (m.byPeriod[d.period]?.decks_used ?? 0), 0);
-    const maxTotal = days.length * 4;
+    const firstSlot = presence.get(key);
+    const values = [];
+    let total = 0;
+    let gamesCount = 0;
+    for (const s of slots) {
+      const r = m.byPeriod[s.period];
+      if (r) {
+        values.push(r.decks_used);
+        total += r.decks_used || 0;
+        gamesCount++;
+      } else {
+        // Se ainda não estava no clã → 'X'; se já estava e não participou → 0
+        values.push(null);
+      }
+    }
     return { 
       key,
       name: m.name, 
       rank: m.rank,
-      byPeriod: m.byPeriod, 
+      firstSlot,
+      values,        // valores na ordem dos slots (1 = mais recente)
       total, 
-      maxTotal,
-      dayValues: days.map(d => m.byPeriod[d.period]?.decks_used ?? -1)
+      gamesCount,
+      maxTotal: MAX_WAR_SLOTS * 4
     };
   });
 
@@ -540,10 +583,12 @@ function renderAttackTable() {
     if (sortMode === 'name') {
       cmp = a.name.localeCompare(b.name);
     } else if (sortMode.startsWith('day-')) {
-      const dayIdx = parseInt(sortMode.split('-')[1]);
-      const aVal = a.dayValues[dayIdx] ?? -1;
-      const bVal = b.dayValues[dayIdx] ?? -1;
+      const dayIdx = parseInt(sortMode.split('-')[1]); // 0-based dentro de values
+      const aVal = a.values[dayIdx] !== null ? a.values[dayIdx] : -1;
+      const bVal = b.values[dayIdx] !== null ? b.values[dayIdx] : -1;
       cmp = aVal - bVal;
+    } else if (sortMode === 'missing') {
+      cmp = (a.maxTotal - a.total) - (b.maxTotal - b.total);
     } else {
       cmp = a.total - b.total;
     }
@@ -557,9 +602,11 @@ function renderAttackTable() {
     return '';
   };
 
-  const headerCells = days.map((d, idx) => 
+  // Cabeçalho fixo: slot 1..20 (1 = mais recente) com o número da guerra entre parênteses
+  const headerCells = slots.map((s, idx) => 
     `<th class="day-col" onclick="toggleSort(${idx})">
-      Dia ${d.dayNumber}<br><span style="opacity:.6">guerra ${d.period}</span>
+      <span style="font-size:11px;opacity:.7">#${s.slot}</span><br>
+      G${s.period}
       ${getSortIndicator(`day-${idx}`)}
     </th>`
   ).join('');
@@ -569,6 +616,7 @@ function renderAttackTable() {
     <th onclick="toggleSort(-1)">
       Membro ${getSortIndicator('name')}
     </th>
+    <th class="day-col" onclick="toggleSort('total')" style="width:60px">Total<br><span style="opacity:.6">${MAX_WAR_SLOTS}G</span>${getSortIndicator('total')}</th>
     ${headerCells}
   </tr>`;
 
@@ -577,18 +625,18 @@ function renderAttackTable() {
       <td class="num-col">${index + 1}</td>
       <td>
         <div class="member-name">${m.name}</div>
-        <div class="member-total">${m.total}/${m.maxTotal} ataques</div>
+        <div class="member-total">${m.total}/${MAX_WAR_SLOTS * 4} em ${m.gamesCount} guerra${m.gamesCount !== 1 ? 's' : ''}</div>
       </td>
-      ${days.map((d, idx) => {
-        const r = m.byPeriod[d.period];
-        const used = r ? r.decks_used : null;
-        if (used === null) return '<td class="shield-cell"><span style="color:var(--text-faint);font-size:11px">—</span></td>';
-        return `<td class="shield-cell"><span class="shield">${shieldSVG(used, 4)}<span class="shield-label">${used}/4</span></span></td>`;
+      <td class="shield-cell" style="font-family:'JetBrains Mono',monospace;font-size:12px">${m.total}</td>
+      ${m.values.map(v => {
+        if (v === null) return '<td class="shield-cell"><span style="color:var(--text-faint);font-size:13px;font-weight:600">✕</span></td>';
+        if (v === 0) return '<td class="shield-cell"><span style="color:var(--text-muted);font-size:12px">0</span></td>';
+        return `<td class="shield-cell"><span class="shield">${shieldSVG(v, 4)}<span class="shield-label">${v}/4</span></span></td>`;
       }).join('')}
     </tr>
   `).join('');
 
-  wrap.innerHTML = `<table><thead>${header}</thead><tbody>${rows}</tbody></table>`;
+  wrap.innerHTML = `<table style="display:block;overflow-x:auto"><div style="min-width:1100px"><table style="width:100%"><thead>${header}</thead><tbody>${rows}</tbody></table></div></table>`;
 }
 
 function renderPromotions() {
