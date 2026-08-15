@@ -602,13 +602,9 @@ function renderAttackTable() {
     return '';
   };
 
-  // Cabeçalho fixo: slot 1..20 (1 = mais recente) com o número da guerra entre parênteses
+  // Cabeçalho fixo: números de 1 a 20 (1 = guerra mais recente)
   const headerCells = slots.map((s, idx) => 
-    `<th class="day-col" onclick="toggleSort(${idx})">
-      <span style="font-size:11px;opacity:.7">#${s.slot}</span><br>
-      G${s.period}
-      ${getSortIndicator(`day-${idx}`)}
-    </th>`
+    `<th class="day-col" onclick="toggleSort(${idx})">${s.slot}${getSortIndicator(`day-${idx}`)}</th>`
   ).join('');
 
   const header = `<tr>
@@ -629,8 +625,7 @@ function renderAttackTable() {
       </td>
       <td class="shield-cell" style="font-family:'JetBrains Mono',monospace;font-size:12px">${m.total}</td>
       ${m.values.map(v => {
-        if (v === null) return '<td class="shield-cell"><span style="color:var(--text-faint);font-size:13px;font-weight:600">✕</span></td>';
-        if (v === 0) return '<td class="shield-cell"><span style="color:var(--text-muted);font-size:12px">0</span></td>';
+        if (v === null) return '<td class="shield-cell"><span style="color:#ff4444;font-size:16px;font-weight:800">✕</span></td>';
         return `<td class="shield-cell"><span class="shield">${shieldSVG(v, 4)}<span class="shield-label">${v}/4</span></span></td>`;
       }).join('')}
     </tr>
