@@ -32,7 +32,7 @@ export default async function handler(req, res) {
         `,
         args: [decodedTag]
       }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Turso (25s)')), 25000))
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Turso (60s)')), 60000))
     ]);
 
     res.status(200).json(result.rows);
