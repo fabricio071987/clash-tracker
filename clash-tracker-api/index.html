@@ -398,9 +398,9 @@ async function loadClanData(tag) {
     // Membros ativos da última guerra (por tag; fallback por nome caso a tag venha vazia)
     state.activeMembers = new Set();
     state.activeMembersByName = new Set();
-    if (wd.length > 0) {
-      const lastPeriod = Math.max(...wd.map(d => d.period_index));
-      const lastWarMembers = wd.filter(d => d.period_index === lastPeriod);
+    if (state.warDays.length > 0) {
+      const lastPeriod = Math.max(...state.warDays.map(d => d.period_index));
+      const lastWarMembers = state.warDays.filter(d => d.period_index === lastPeriod);
       lastWarMembers.forEach(d => {
         if (d.member_tag) state.activeMembers.add(d.member_tag);
         state.activeMembersByName.add((d.member_name || '').trim().toLowerCase());
