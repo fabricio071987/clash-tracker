@@ -104,16 +104,18 @@ async function collectClanAttacks(clan) {
       });
     }
 
-    // Mantém no banco apenas as últimas 20 rodadas de guerra
+    // Mantém no banco apenas as últimas 20 rodadas de guerra (limpeza enxuta).
+    // Passo 1: identifica os periods a apagar (mais antigos que as 20 mais recentes)
     statements.push({
       sql: `
-        DELETE FROM war_days 
-        WHERE clan_tag = ? AND period_index NOT IN (
-          SELECT DISTINCT period_index 
-          FROM war_days 
-          WHERE clan_tag = ? 
-          ORDER BY period_index DESC 
-          LIMIT 20
+        DELETE FROM war_days
+        WHERE clan_tag = ? AND period_index < (
+          SELECT MIN(period_index) FROM (
+            SELECT DISTINCT period_index FROM war_days
+            WHERE clan_tag = ?
+            ORDER BY period_index DESC
+            LIMIT 20
+          )
         )
       `,
       args: [clan.tag, clan.tag]

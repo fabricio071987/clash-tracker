@@ -57,7 +57,8 @@ async function calculatePromotions(clan) {
       return { clan: clan.tag, status: 'no_members' };
     }
 
-    const log = await callRoyaleAPIWithRetry(`/clans/${encodeTag(clan.tag)}/riverracelog?limit=10`);
+    // Só as 8 últimas semanas são usadas para o cálculo da média (retenção enxuta)
+    const log = await callRoyaleAPIWithRetry(`/clans/${encodeTag(clan.tag)}/riverracelog?limit=8`);
     const items = log.items || [];
     if (items.length === 0) {
       return { clan: clan.tag, status: 'no_history' };
