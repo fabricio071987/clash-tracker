@@ -1,13 +1,14 @@
 // ============================================================
-// SNAPSHOT (leve): lê apenas a tabela de cache (cache_data),
-// que já vem pronta gravada pelo cronjob (run-attacks /
-// run-promotions). Nunca faz consulta pesada ao vivo:
-// responde em milissegundos, dentro do limite da Vercel.
-// Se o cache estiver vazio (primeira vez), tenta preencher
-// na hora com timeout curto para não travar o site.
+// SNAPSHOT (leve): monta a resposta combinando:
+//   - war_cache_war: 1 SELECT leve por guerra (período)
+//   - war_cache_meta: lista dos períodos conhecidos do clã
+//   - cache_data: promotions prontas
+// Nenhuma consulta pesada; responde em ms.
 // ============================================================
 import { createClient } from '@libsql/client';
-import { refreshWarCache, refreshPromoCache } from '../cache-utils.js';
+import { ensureCacheTables } from '../cache-utils.js';
+
+const MAX_WAR_SLOTS = 20;
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -27,52 +28,57 @@ export default async function handler(req, res) {
       url: process.env.TURSO_DATABASE_URL,
       authToken: process.env.TURSO_AUTH_TOKEN,
     });
+    await ensureCacheTables(turso);
 
-    // 1) Leitura leve: 1 linha do cache por clã
-    const cached = await Promise.race([
-      turso.execute({
-        sql: `SELECT war_days, promotions, updated_at FROM cache_data WHERE clan_tag = ?`,
-        args: [decodedTag]
-      }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout (20s)')), 20000))
-    ]);
+    const timeoutMs = 8000;
 
-    let warDays = [];
-    let promotions = [];
-    let updatedAt = null;
-
-    if (cached.rows && cached.rows.length > 0) {
-      warDays = JSON.parse(cached.rows[0].war_days || '[]');
-      promotions = JSON.parse(cached.rows[0].promotions || '[]');
-      updatedAt = cached.rows[0].updated_at;
+    // 1) Meta: períodos conhecidos do clã (cache ou banco, leve)
+    const metaQuery = turso.execute({
+      sql: `SELECT periods_json FROM war_cache_meta WHERE clan_tag = ?`,
+      args: [decodedTag]
+    });
+    const metaResult = await Promise.race([metaQuery, new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout (8s)')), timeoutMs))]);
+    let periods = [];
+    if (metaResult.rows && metaResult.rows.length > 0) {
+      periods = JSON.parse(metaResult.rows[0].periods_json || '[]');
     }
 
-    // 2) Primeira vez (cache vazio): preenche na hora, com proteção de tempo
-    if (!updatedAt) {
+    // 2) Guerras: buscar cada período com consulta leve, até preencher 20 slots
+    const wanted = periods.slice(0, MAX_WAR_SLOTS); // mais recentes primeiro
+    const warRows = [];
+    for (const period of wanted) {
       try {
-        const [warRows, promoRows] = await Promise.allSettled([
-          refreshWarCache(turso, decodedTag),
-          refreshPromoCache(turso, decodedTag)
+        const w = await Promise.race([
+          turso.execute({
+            sql: `SELECT rows_json FROM war_cache_war WHERE clan_tag = ? AND period_index = ?`,
+            args: [decodedTag, period]
+          }),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout (8s)')), timeoutMs))
         ]);
-        if (warRows.status === 'fulfilled') warDays = warRows.value.map(r => r) || [];
-        if (promoRows.status === 'fulfilled') promotions = promoRows.value.map(r => r) || [];
-        // refetch pós-gravação para garantir consistência
-        const fresh = await turso.execute({
-          sql: `SELECT war_days, promotions, updated_at FROM cache_data WHERE clan_tag = ?`,
-          args: [decodedTag]
-        });
-        if (fresh.rows && fresh.rows.length > 0) {
-          warDays = JSON.parse(fresh.rows[0].war_days || '[]');
-          promotions = JSON.parse(fresh.rows[0].promotions || '[]');
-          updatedAt = fresh.rows[0].updated_at;
+        if (w.rows && w.rows.length > 0) {
+          const parsed = JSON.parse(w.rows[0].rows_json || '[]');
+          warRows.push(...parsed);
         }
       } catch (e) {
-        console.error('Erro ao preencher cache inicial:', e.message);
+        console.error(`[SNAPSHOT] falha ao ler período ${period}: ${e.message}`);
       }
     }
 
+    // 3) Promoções
+    const promoQuery = turso.execute({
+      sql: `SELECT promotions, updated_at FROM cache_data WHERE clan_tag = ?`,
+      args: [decodedTag]
+    });
+    const promoResult = await Promise.race([promoQuery, new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout (8s)')), timeoutMs))]);
+    const promotions = promoResult.rows && promoResult.rows.length > 0
+      ? JSON.parse(promoResult.rows[0].promotions || '[]')
+      : [];
+    const updatedAt = promoResult.rows && promoResult.rows.length > 0
+      ? promoResult.rows[0].updated_at
+      : null;
+
     res.setHeader('Cache-Control', 'public, max-age=300');
-    return res.status(200).json({ war_days: warDays, promotions, generated_at: updatedAt || new Date().toISOString() });
+    return res.status(200).json({ war_days: warRows, promotions, generated_at: updatedAt || new Date().toISOString() });
   } catch (error) {
     console.error('Erro em snapshot:', error.message);
     return res.status(500).json({ error: `Erro na consulta ao banco: ${error.message}` });

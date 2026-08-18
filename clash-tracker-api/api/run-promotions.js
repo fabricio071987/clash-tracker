@@ -1,5 +1,5 @@
 import { createClient } from '@libsql/client';
-import { refreshPromoCache } from './cache-utils.js';
+import { refreshPromoCache } from './cache-utils.js'; // usa refreshPromoCache (cache por clã)
 
 const turso = createClient({
   url: process.env.TURSO_DATABASE_URL,
