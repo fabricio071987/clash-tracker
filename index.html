@@ -381,29 +381,26 @@ async function loadClanData(tag) {
   document.getElementById('clanLabel').textContent = tag;
   setStatus(true, 'Carregando dados…');
   try {
-    // Timeout de 25 segundos (o banco Turso pode demorar um pouco para responder)
-    const controller1 = new AbortController();
-    const controller2 = new AbortController();
-    const timeout1 = setTimeout(() => controller1.abort(), 25000);
-    const timeout2 = setTimeout(() => controller2.abort(), 25000);
+    // NOVO FLUXO: lê o endpoint /api/snapshot/{tag}, que retorna war_days e
+    // promotions juntos em um único JSON leve, com cache de 5 minutos na Vercel.
+    // Assim o navegador não consulta o banco Turso ao vivo a cada visita —
+    // o site carrega rápido mesmo quando o banco está lento.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
 
-    const [wd, pr] = await Promise.all([
-      fetch(state.apiUrl + '/api/war-days/' + encodeURIComponent(tag), { signal: controller1.signal }).then(r => r.json()),
-      fetch(state.apiUrl + '/api/promotions/' + encodeURIComponent(tag), { signal: controller2.signal }).then(r => r.json()),
-    ]);
+    const snap = await fetch(state.apiUrl + '/api/snapshot/' + encodeURIComponent(tag), { signal: controller.signal }).then(r => r.json());
 
-    clearTimeout(timeout1);
-    clearTimeout(timeout2);
+    clearTimeout(timeout);
 
-    state.warDays = wd;
-    state.promotions = pr;
+    state.warDays = snap.war_days || [];
+    state.promotions = snap.promotions || [];
     
     // Membros ativos da última guerra (por tag; fallback por nome caso a tag venha vazia)
     state.activeMembers = new Set();
     state.activeMembersByName = new Set();
-    if (wd.length > 0) {
-      const lastPeriod = Math.max(...wd.map(d => d.period_index));
-      const lastWarMembers = wd.filter(d => d.period_index === lastPeriod);
+    if (state.warDays.length > 0) {
+      const lastPeriod = Math.max(...state.warDays.map(d => d.period_index));
+      const lastWarMembers = state.warDays.filter(d => d.period_index === lastPeriod);
       lastWarMembers.forEach(d => {
         if (d.member_tag) state.activeMembers.add(d.member_tag);
         state.activeMembersByName.add((d.member_name || '').trim().toLowerCase());
