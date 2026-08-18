@@ -1,4 +1,5 @@
 import { createClient } from '@libsql/client';
+import { refreshWarCache } from './cache-utils.js';
 
 const turso = createClient({
   url: process.env.TURSO_DATABASE_URL,
@@ -126,6 +127,14 @@ async function collectClanAttacks(clan) {
         turso.batch(statements, "write"),
         new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Turso Batch (25s)')), 25000))
       ]);
+    }
+
+    // ===== NOVO: grava o cache de leitura (site nunca consulta o banco ao vivo) =====
+    try {
+      await refreshWarCache(turso, clan.tag);
+    } catch (cacheErr) {
+      console.error(`[${clan.tag}] Falha ao atualizar cache: ${cacheErr.message}`);
+      // não falha a coleta: o cache continuará com os dados da última coleta bem-sucedida
     }
 
     return { clan: clan.tag, status: 'success', saved: statements.length - 1 };
