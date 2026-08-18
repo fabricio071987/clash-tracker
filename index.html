@@ -381,10 +381,9 @@ async function loadClanData(tag) {
   document.getElementById('clanLabel').textContent = tag;
   setStatus(true, 'Carregando dados…');
   try {
-    // NOVO FLUXO: lê o endpoint /api/snapshot/{tag}, que retorna war_days e
-    // promotions juntos em um único JSON leve, com cache de 5 minutos na Vercel.
-    // Assim o navegador não consulta o banco Turso ao vivo a cada visita —
-    // o site carrega rápido mesmo quando o banco está lento.
+    // FLUXO DEFINITIVO: lê o endpoint /api/snapshot/{tag} — um único JSON
+    // leve, com cache de 5 minutos na Vercel. O site nunca mais consulta o
+    // banco Turso ao vivo, então não "some" quando o banco está lento.
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
 
