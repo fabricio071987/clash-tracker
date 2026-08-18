@@ -405,6 +405,13 @@ async function loadClanData(tag) {
         if (d.member_tag) state.activeMembers.add(d.member_tag);
         state.activeMembersByName.add((d.member_name || '').trim().toLowerCase());
       });
+    } else {
+      // Sem dados de guerra ainda: considerar todos os membros calculados
+      // como ativos, para que as médias de promoção sempre apareçam
+      state.promotions.forEach(p => {
+        if (p.member_tag) state.activeMembers.add(p.member_tag);
+        state.activeMembersByName.add((p.member_name || '').trim().toLowerCase());
+      });
     }
 
     function isActiveMember(p) {
