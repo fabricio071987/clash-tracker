@@ -158,7 +158,16 @@ async function migrateOldData(clanTag, seasonId, race) {
 async function collectClanAttacks(clan) {
   console.log(`[ATTACKS] Coletando dados do clã ${clan.tag}`);
 
-  const race = await callRoyaleAPIWithRetry(`/clans/${encodeTag(clan.tag)}/currentriverrace`);
+  let race;
+  try {
+    race = await callRoyaleAPIWithRetry(`/clans/${encodeTag(clan.tag)}/currentriverrace`);
+  } catch (err) {
+    // 404 = clã não está participando de guerra (ou tag inexistente). Não é falha do sistema.
+    if (String(err.message).includes('HTTP 404')) {
+      return { clan: clan.tag, status: 'sem_guerra' };
+    }
+    throw err;
+  }
   const isWarDay = WAR_PERIOD_TYPES.has(race.periodType);
 
   // Só precisamos da temporada em dia de guerra ou se ainda houver dados antigos para migrar
