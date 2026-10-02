@@ -399,8 +399,8 @@ async function loadClanData(tag) {
     state.activeMembers = new Set();
     state.activeMembersByName = new Set();
     if (state.warDays.length > 0) {
-      const lastPeriod = Math.max(...state.warDays.map(d => d.period_index));
-      const lastWarMembers = state.warDays.filter(d => d.period_index === lastPeriod);
+      const lastPeriod = Math.max(...state.warDays.map(warKeyOf));
+      const lastWarMembers = state.warDays.filter(d => warKeyOf(d) === lastPeriod);
       lastWarMembers.forEach(d => {
         if (d.member_tag) state.activeMembers.add(d.member_tag);
         state.activeMembersByName.add((d.member_name || '').trim().toLowerCase());
@@ -463,24 +463,21 @@ function togglePromoSort(column) {
 }
 
 // ============================================================
-// TABELA FIXA DE 20 GUERRAS
-// slot 0 = guerra mais recente, slot 19 = mais antiga
+// TABELA FIXA DE 16 DIAS DE GUERRA (inclui Coliseu)
+// slot 1 = dia mais recente, slot 16 = mais antigo
 // ============================================================
-const MAX_WAR_SLOTS = 20;
+const MAX_WAR_SLOTS = 16;
+
+// Identificador único do dia de guerra (temporada + dia). Não se repete entre temporadas.
+function warKeyOf(row) {
+  return row.war_key != null ? Number(row.war_key) : Number(row.period_index);
+}
 
 function buildWarSlots() {
-  // Coleta as guerras conhecidas (section+period únicos), ordenadas por data de coleta mais recente
-  const warsMap = new Map();
-  state.warDays.forEach(row => {
-    const period = row.period_index;
-    const updated = row.updated_at || '';
-    if (!warsMap.has(period) || updated > warsMap.get(period)) {
-      warsMap.set(period, updated);
-    }
-  });
-  // Ordena do mais recente para o mais antigo (data de atualização)
-  const sortedWars = Array.from(warsMap.entries()).sort((a, b) => (b[1] > a[1] ? 1 : -1)).map(e => e[0]);
-  // Pega as 20 mais recentes (as 20 mais recentes ficam nos slots 0..19)
+  // Dias de guerra conhecidos (war_key únicos), do mais recente para o mais antigo
+  const keys = new Set(state.warDays.map(warKeyOf));
+  const sortedWars = Array.from(keys).sort((a, b) => b - a);
+  // Pega os 16 mais recentes
   const last20 = sortedWars.slice(0, MAX_WAR_SLOTS);
   // slots[0] = mais recente, slots[19] = mais antiga
   const slots = last20.map((period, idx) => ({ slot: idx + 1, period }));
@@ -537,9 +534,10 @@ function renderAttackTable() {
     }
     const m = membersMap.get(key);
     // Mantém o registro com a informação mais recente
-    const existing = m.byPeriod[row.period_index];
+    const wk = warKeyOf(row);
+    const existing = m.byPeriod[wk];
     if (!existing || (row.updated_at || '') > (existing.updated_at || '')) {
-      m.byPeriod[row.period_index] = row;
+      m.byPeriod[wk] = row;
     }
     if ((row.updated_at || '') > (m.lastUpdate || '')) {
       m.name = row.member_name;
