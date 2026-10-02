@@ -1,15 +1,21 @@
 // ============================================================
-// SNAPSHOT: devolve para o site
-//   - war_days: últimos 16 dias de guerra do clã (tabela war_log)
-//   - promotions: promoções prontas (cache_data)
-// Cada parte é lida separadamente: se uma falhar, a outra
-// continua aparecendo no site, e o motivo vai em "errors".
+// SNAPSHOT: devolve para o site, lendo UMA linha do banco:
+//   - war_days: últimos 16 dias de guerra (montado na coleta)
+//   - promotions: promoções prontas
 // ============================================================
 import { createClient } from '@libsql/client';
-import { ensureCacheTables, readWarLog } from '../cache-utils.js';
 
 function withTimeout(promise, ms) {
   return Promise.race([promise, new Promise((_, rej) => setTimeout(() => rej(new Error(`Timeout (${ms / 1000}s)`)), ms))]);
+}
+
+function safeParse(text, label, errors) {
+  try {
+    return JSON.parse(text || '[]');
+  } catch (e) {
+    errors.push(`${label}: JSON inválido`);
+    return [];
+  }
 }
 
 export default async function handler(req, res) {
@@ -36,28 +42,20 @@ export default async function handler(req, res) {
   let updatedAt = null;
 
   try {
-    warRows = await withTimeout(readWarLog(turso, decodedTag), 20000);
-  } catch (e) {
-    console.error('[SNAPSHOT] ataques:', e.message);
-    errors.push(`ataques: ${e.message}`);
-  }
-
-  try {
-    await withTimeout(ensureCacheTables(turso), 10000);
-    const promoResult = await withTimeout(turso.execute({
-      sql: `SELECT promotions, updated_at FROM cache_data WHERE clan_tag = ?`,
+    const r = await withTimeout(turso.execute({
+      sql: `SELECT war_days, promotions, updated_at FROM cache_data WHERE clan_tag = ?`,
       args: [decodedTag]
-    }), 15000);
-    if (promoResult.rows && promoResult.rows.length > 0) {
-      promotions = JSON.parse(promoResult.rows[0].promotions || '[]');
-      updatedAt = promoResult.rows[0].updated_at;
+    }), 20000);
+    if (r.rows && r.rows.length > 0) {
+      warRows = safeParse(r.rows[0].war_days, 'ataques', errors);
+      promotions = safeParse(r.rows[0].promotions, 'promoções', errors);
+      updatedAt = r.rows[0].updated_at;
     }
   } catch (e) {
-    console.error('[SNAPSHOT] promoções:', e.message);
-    errors.push(`promoções: ${e.message}`);
+    console.error('[SNAPSHOT]', e.message);
+    errors.push(e.message);
   }
 
-  // Só deixa a Vercel guardar em cache se veio tudo certo
   res.setHeader('Cache-Control', errors.length ? 'no-store' : 'public, max-age=300');
   return res.status(200).json({
     war_days: warRows,
