@@ -1,16 +1,18 @@
 // ============================================================
-// cache-utils.js: cache de leitura LEVE, gravado guerra a guerra.
+// cache-utils.js
 //
-// Estrutura:
-//   war_cache_war: 1 linha por (clan_tag, period_index) -> JSON das
-//                  linhas de war_days daquela guerra (~50 linhas).
-//   war_cache_meta: 1 linha por clan_tag -> JSON dos period_index
-//                   conhecidos (para montar a tabela 1-20).
-//   cache_data:     promotions prontas (consulta leve, 1 linha/clã).
-//
-// Todas as operações são rápidas (<2s) e cabem no limite da Vercel.
+// Tabelas:
+//   war_log:    dias de guerra (inclui Coliseu). 1 linha por
+//               (clan_tag, war_key, member_tag). Guarda só os
+//               últimos 16 dias de guerra de cada clã.
+//               war_key = season_id * 1000 + period_index
+//               -> número único e crescente, não se repete
+//                  quando a temporada vira.
+//   cache_data: promotions prontas (1 linha por clã).
 // ============================================================
 import { createClient } from '@libsql/client';
+
+export const MAX_WAR_DAYS = 16;
 
 export function cacheTurso() {
   return createClient({
@@ -19,23 +21,27 @@ export function cacheTurso() {
   });
 }
 
-export async function ensureCacheTables(turso) {
+export async function ensureWarLog(turso) {
   await turso.execute(`
-    CREATE TABLE IF NOT EXISTS war_cache_war (
+    CREATE TABLE IF NOT EXISTS war_log (
       clan_tag TEXT NOT NULL,
+      war_key INTEGER NOT NULL,
+      season_id INTEGER NOT NULL,
+      section_index INTEGER NOT NULL,
       period_index INTEGER NOT NULL,
-      rows_json TEXT NOT NULL DEFAULT '[]',
-      updated_at TEXT NOT NULL DEFAULT '',
-      PRIMARY KEY (clan_tag, period_index)
+      period_type TEXT NOT NULL DEFAULT 'warDay',
+      member_tag TEXT NOT NULL,
+      member_name TEXT,
+      member_rank TEXT,
+      decks_used INTEGER NOT NULL DEFAULT 0,
+      decks_total INTEGER NOT NULL DEFAULT 4,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (clan_tag, war_key, member_tag)
     )
   `);
-  await turso.execute(`
-    CREATE TABLE IF NOT EXISTS war_cache_meta (
-      clan_tag TEXT PRIMARY KEY,
-      periods_json TEXT NOT NULL DEFAULT '[]',
-      updated_at TEXT NOT NULL DEFAULT ''
-    )
-  `);
+}
+
+export async function ensureCacheTables(turso) {
   await turso.execute(`
     CREATE TABLE IF NOT EXISTS cache_data (
       clan_tag TEXT PRIMARY KEY,
@@ -46,59 +52,41 @@ export async function ensureCacheTables(turso) {
   `);
 }
 
-// ===== WARS: cache guerra a guerra =====
-
-// Grava (ou atualiza) UMA guerra no cache. Consulta LEVE por período.
-export async function refreshWarCachePeriod(turso, clanTag, periodIndex) {
-  await ensureCacheTables(turso);
-
-  const war = await turso.execute({
+// Apaga tudo que for mais antigo que os últimos 16 dias de guerra do clã.
+export function trimWarLogStatement(clanTag) {
+  return {
     sql: `
-      SELECT member_tag, member_name, member_rank, section_index,
-             period_index, decks_used, decks_total, updated_at
-      FROM war_days
-      WHERE clan_tag = ? AND is_active = 1 AND period_index = ?
+      DELETE FROM war_log
+      WHERE clan_tag = ? AND war_key < (
+        SELECT COALESCE(MIN(war_key), 0) FROM (
+          SELECT DISTINCT war_key FROM war_log
+          WHERE clan_tag = ?
+          ORDER BY war_key DESC
+          LIMIT ${MAX_WAR_DAYS}
+        )
+      )
     `,
-    args: [clanTag, periodIndex]
-  });
-
-  await turso.execute({
-    sql: `
-      INSERT INTO war_cache_war (clan_tag, period_index, rows_json, updated_at)
-      VALUES (?, ?, ?, ?)
-      ON CONFLICT(clan_tag, period_index) DO UPDATE SET
-        rows_json = excluded.rows_json,
-        updated_at = excluded.updated_at
-    `,
-    args: [clanTag, periodIndex, JSON.stringify(war.rows || []), new Date().toISOString()]
-  });
-  return war.rows.length;
+    args: [clanTag, clanTag],
+  };
 }
 
-// Atualiza a meta (lista de períodos conhecidos) de um clã.
-export async function refreshWarCacheMeta(turso, clanTag) {
-  await ensureCacheTables(turso);
-
-  const meta = await turso.execute({
-    sql: `SELECT DISTINCT period_index FROM war_days WHERE clan_tag = ? ORDER BY period_index DESC LIMIT 25`,
-    args: [clanTag]
-  });
-  const periods = meta.rows.map(r => r.period_index);
-
-  await turso.execute({
+// Lê os últimos 16 dias de guerra de um clã (tabela pequena, consulta leve).
+export async function readWarLog(turso, clanTag) {
+  await ensureWarLog(turso);
+  const r = await turso.execute({
     sql: `
-      INSERT INTO war_cache_meta (clan_tag, periods_json, updated_at)
-      VALUES (?, ?, ?)
-      ON CONFLICT(clan_tag) DO UPDATE SET
-        periods_json = excluded.periods_json,
-        updated_at = excluded.updated_at
+      SELECT war_key, season_id, section_index, period_index, period_type,
+             member_tag, member_name, member_rank, decks_used, decks_total, updated_at
+      FROM war_log
+      WHERE clan_tag = ?
+      ORDER BY war_key DESC, member_name ASC
     `,
-    args: [clanTag, JSON.stringify(periods), new Date().toISOString()]
+    args: [clanTag],
   });
-  return periods.length;
+  return r.rows || [];
 }
 
-// ===== PROMOTIONS: cache por clã (consulta leve) =====
+// ===== PROMOTIONS: cache por clã (lógica inalterada) =====
 
 export async function refreshPromoCache(turso, clanTag, options = {}) {
   await ensureCacheTables(turso);
@@ -127,12 +115,13 @@ export async function refreshPromoCache(turso, clanTag, options = {}) {
   await turso.execute({
     sql: `
       INSERT INTO cache_data (clan_tag, war_days, promotions, updated_at)
-      VALUES (?, COALESCE((SELECT war_days FROM cache_data WHERE clan_tag = ?), '[]'), ?, ?)
+      VALUES (?, '[]', ?, ?)
       ON CONFLICT(clan_tag) DO UPDATE SET
+        war_days = '[]',
         promotions = excluded.promotions,
         updated_at = excluded.updated_at
     `,
-    args: [clanTag, clanTag, promosJson, new Date().toISOString()]
+    args: [clanTag, promosJson, new Date().toISOString()]
   });
   console.log(`[CACHE] promotions atualizado para ${clanTag} (${rows.length} linhas)`);
   return rows.length;

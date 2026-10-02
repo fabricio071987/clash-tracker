@@ -1,14 +1,14 @@
 // ============================================================
-// SNAPSHOT (leve): monta a resposta combinando:
-//   - war_cache_war: 1 SELECT leve por guerra (período)
-//   - war_cache_meta: lista dos períodos conhecidos do clã
-//   - cache_data: promotions prontas
-// Nenhuma consulta pesada; responde em ms.
+// SNAPSHOT: devolve para o site
+//   - war_days: últimos 16 dias de guerra do clã (tabela war_log)
+//   - promotions: promoções prontas (cache_data)
 // ============================================================
 import { createClient } from '@libsql/client';
-import { ensureCacheTables } from '../cache-utils.js';
+import { ensureCacheTables, readWarLog } from '../cache-utils.js';
 
-const MAX_WAR_SLOTS = 20;
+function withTimeout(promise, ms) {
+  return Promise.race([promise, new Promise((_, rej) => setTimeout(() => rej(new Error(`Timeout (${ms / 1000}s)`)), ms))]);
+}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -30,46 +30,12 @@ export default async function handler(req, res) {
     });
     await ensureCacheTables(turso);
 
-    const timeoutMs = 8000;
+    const warRows = await withTimeout(readWarLog(turso, decodedTag), 8000);
 
-    // 1) Meta: períodos conhecidos do clã (cache ou banco, leve)
-    const metaQuery = turso.execute({
-      sql: `SELECT periods_json FROM war_cache_meta WHERE clan_tag = ?`,
-      args: [decodedTag]
-    });
-    const metaResult = await Promise.race([metaQuery, new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout (8s)')), timeoutMs))]);
-    let periods = [];
-    if (metaResult.rows && metaResult.rows.length > 0) {
-      periods = JSON.parse(metaResult.rows[0].periods_json || '[]');
-    }
-
-    // 2) Guerras: buscar cada período com consulta leve, até preencher 20 slots
-    const wanted = periods.slice(0, MAX_WAR_SLOTS); // mais recentes primeiro
-    const warRows = [];
-    for (const period of wanted) {
-      try {
-        const w = await Promise.race([
-          turso.execute({
-            sql: `SELECT rows_json FROM war_cache_war WHERE clan_tag = ? AND period_index = ?`,
-            args: [decodedTag, period]
-          }),
-          new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout (8s)')), timeoutMs))
-        ]);
-        if (w.rows && w.rows.length > 0) {
-          const parsed = JSON.parse(w.rows[0].rows_json || '[]');
-          warRows.push(...parsed);
-        }
-      } catch (e) {
-        console.error(`[SNAPSHOT] falha ao ler período ${period}: ${e.message}`);
-      }
-    }
-
-    // 3) Promoções
-    const promoQuery = turso.execute({
+    const promoResult = await withTimeout(turso.execute({
       sql: `SELECT promotions, updated_at FROM cache_data WHERE clan_tag = ?`,
       args: [decodedTag]
-    });
-    const promoResult = await Promise.race([promoQuery, new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout (8s)')), timeoutMs))]);
+    }), 8000);
     const promotions = promoResult.rows && promoResult.rows.length > 0
       ? JSON.parse(promoResult.rows[0].promotions || '[]')
       : [];
