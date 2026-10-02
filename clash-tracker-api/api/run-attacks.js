@@ -1,5 +1,5 @@
 import { createClient } from '@libsql/client';
-import { ensureWarLog, trimWarLogStatement, MAX_WAR_DAYS } from './cache-utils.js';
+import { ensureWarLog, ensureCacheTables, trimWarLogStatement, refreshWarCacheStatement, MAX_WAR_DAYS } from './cache-utils.js';
 
 const turso = createClient({
   url: process.env.TURSO_DATABASE_URL,
@@ -149,6 +149,7 @@ async function migrateOldData(clanTag, seasonId, race) {
     },
     { sql: `DELETE FROM war_days WHERE clan_tag = ?`, args: [clanTag] },
     trimWarLogStatement(clanTag),
+    refreshWarCacheStatement(clanTag),
   ];
   await withTimeout(turso.batch(statements, 'write'), 25000, 'Turso migração');
   console.log(`[${clanTag}] Migrados ${totalOld} registros antigos para war_log`);
@@ -223,8 +224,9 @@ async function collectClanAttacks(clan) {
     });
   }
 
-  // Mantém só os últimos 16 dias de guerra
+  // Mantém só os últimos 16 dias de guerra e atualiza a linha que o site lê
   statements.push(trimWarLogStatement(clan.tag));
+  statements.push(refreshWarCacheStatement(clan.tag));
 
   await withTimeout(turso.batch(statements, 'write'), 25000, 'Turso batch');
 
@@ -236,7 +238,7 @@ async function collectClanAttacks(clan) {
     sectionIndex: race.sectionIndex,
     periodIndex: race.periodIndex,
     warKey,
-    saved: statements.length - 1,
+    saved: statements.length - 2,
     migrated,
   };
 }
@@ -263,6 +265,7 @@ export default async function handler(req, res) {
 
   try {
     await ensureWarLog(turso);
+    await ensureCacheTables(turso);
 
     const { tag } = req.query;
     let clans = [];

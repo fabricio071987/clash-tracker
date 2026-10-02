@@ -86,6 +86,29 @@ export async function readWarLog(turso, clanTag) {
   return r.rows || [];
 }
 
+
+// Monta, dentro do próprio banco, uma única linha JSON com os 16 dias de guerra
+// do clã e grava em cache_data.war_days. Nenhuma linha trafega pela rede.
+export function refreshWarCacheStatement(clanTag) {
+  return {
+    sql: `
+      INSERT INTO cache_data (clan_tag, war_days, promotions, updated_at)
+      VALUES (?, (
+        SELECT COALESCE(json_group_array(json_object(
+          'war_key', war_key, 'season_id', season_id, 'section_index', section_index,
+          'period_index', period_index, 'period_type', period_type,
+          'member_tag', member_tag, 'member_name', member_name, 'member_rank', member_rank,
+          'decks_used', decks_used, 'decks_total', decks_total, 'updated_at', updated_at
+        )), '[]')
+        FROM war_log WHERE clan_tag = ?
+      ), '[]', ?)
+      ON CONFLICT(clan_tag) DO UPDATE SET
+        war_days = excluded.war_days
+    `,
+    args: [clanTag, clanTag, new Date().toISOString()],
+  };
+}
+
 // ===== PROMOTIONS: cache por clã (lógica inalterada) =====
 
 export async function refreshPromoCache(turso, clanTag, options = {}) {
@@ -117,7 +140,6 @@ export async function refreshPromoCache(turso, clanTag, options = {}) {
       INSERT INTO cache_data (clan_tag, war_days, promotions, updated_at)
       VALUES (?, '[]', ?, ?)
       ON CONFLICT(clan_tag) DO UPDATE SET
-        war_days = '[]',
         promotions = excluded.promotions,
         updated_at = excluded.updated_at
     `,
