@@ -2,6 +2,8 @@
 // SNAPSHOT: devolve para o site
 //   - war_days: últimos 16 dias de guerra do clã (tabela war_log)
 //   - promotions: promoções prontas (cache_data)
+// Cada parte é lida separadamente: se uma falhar, a outra
+// continua aparecendo no site, e o motivo vai em "errors".
 // ============================================================
 import { createClient } from '@libsql/client';
 import { ensureCacheTables, readWarLog } from '../cache-utils.js';
@@ -23,30 +25,44 @@ export default async function handler(req, res) {
   }
   const decodedTag = decodeURIComponent(tag);
 
+  const turso = createClient({
+    url: process.env.TURSO_DATABASE_URL,
+    authToken: process.env.TURSO_AUTH_TOKEN,
+  });
+
+  const errors = [];
+  let warRows = [];
+  let promotions = [];
+  let updatedAt = null;
+
   try {
-    const turso = createClient({
-      url: process.env.TURSO_DATABASE_URL,
-      authToken: process.env.TURSO_AUTH_TOKEN,
-    });
-    await ensureCacheTables(turso);
+    warRows = await withTimeout(readWarLog(turso, decodedTag), 20000);
+  } catch (e) {
+    console.error('[SNAPSHOT] ataques:', e.message);
+    errors.push(`ataques: ${e.message}`);
+  }
 
-    const warRows = await withTimeout(readWarLog(turso, decodedTag), 8000);
-
+  try {
+    await withTimeout(ensureCacheTables(turso), 10000);
     const promoResult = await withTimeout(turso.execute({
       sql: `SELECT promotions, updated_at FROM cache_data WHERE clan_tag = ?`,
       args: [decodedTag]
-    }), 8000);
-    const promotions = promoResult.rows && promoResult.rows.length > 0
-      ? JSON.parse(promoResult.rows[0].promotions || '[]')
-      : [];
-    const updatedAt = promoResult.rows && promoResult.rows.length > 0
-      ? promoResult.rows[0].updated_at
-      : null;
-
-    res.setHeader('Cache-Control', 'public, max-age=300');
-    return res.status(200).json({ war_days: warRows, promotions, generated_at: updatedAt || new Date().toISOString() });
-  } catch (error) {
-    console.error('Erro em snapshot:', error.message);
-    return res.status(500).json({ error: `Erro na consulta ao banco: ${error.message}` });
+    }), 15000);
+    if (promoResult.rows && promoResult.rows.length > 0) {
+      promotions = JSON.parse(promoResult.rows[0].promotions || '[]');
+      updatedAt = promoResult.rows[0].updated_at;
+    }
+  } catch (e) {
+    console.error('[SNAPSHOT] promoções:', e.message);
+    errors.push(`promoções: ${e.message}`);
   }
+
+  // Só deixa a Vercel guardar em cache se veio tudo certo
+  res.setHeader('Cache-Control', errors.length ? 'no-store' : 'public, max-age=300');
+  return res.status(200).json({
+    war_days: warRows,
+    promotions,
+    generated_at: updatedAt || new Date().toISOString(),
+    errors,
+  });
 }
