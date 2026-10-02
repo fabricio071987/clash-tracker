@@ -14,12 +14,22 @@ const WAR_PERIOD_TYPES = new Set(['warDay', 'colosseum']);
 
 async function callRoyaleAPI(path) {
   const token = process.env.ROYALE_API_TOKEN;
-  const res = await fetch(`${ROYALE_API_BASE}${path}`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'User-Agent': 'clash-clan-tracker-worker',
-    },
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  let res;
+  try {
+    res = await fetch(`${ROYALE_API_BASE}${path}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'User-Agent': 'clash-clan-tracker-worker',
+      },
+      signal: controller.signal,
+    });
+  } catch (err) {
+    throw new Error(`RoyaleAPI ${path} -> ${err.name === 'AbortError' ? 'timeout 8s' : err.message}`);
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!res.ok) {
     const errorText = await res.text();
@@ -28,7 +38,7 @@ async function callRoyaleAPI(path) {
   return res.json();
 }
 
-async function callRoyaleAPIWithRetry(path, retries = 2) {
+async function callRoyaleAPIWithRetry(path, retries = 1) {
   let lastErr;
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
@@ -91,24 +101,22 @@ async function oldTableExists(name) {
 async function migrateOldData(clanTag, seasonId, race) {
   if (!(await oldTableExists('war_days'))) return 0;
 
-  const old = await turso.execute({
+  const old = await withTimeout(turso.execute({
     sql: `
-      SELECT section_index, period_index, member_tag, member_name, member_rank,
-             decks_used, decks_total, updated_at
+      SELECT period_index, MAX(updated_at) AS last_update, COUNT(*) AS n
       FROM war_days
       WHERE clan_tag = ? AND is_active = 1
+      GROUP BY period_index
     `,
     args: [clanTag],
-  });
+  }), 15000, 'Turso leitura antiga');
   if (old.rows.length === 0) return 0;
+  const totalOld = old.rows.reduce((acc, r) => acc + Number(r.n), 0);
 
-  // Agrupa por period_index e ordena do mais recente para o mais antigo (pela data)
-  const byPeriod = new Map();
-  for (const r of old.rows) {
-    const cur = byPeriod.get(r.period_index);
-    if (!cur || r.updated_at > cur) byPeriod.set(r.period_index, r.updated_at);
-  }
-  const periodsNewestFirst = [...byPeriod.entries()].sort((a, b) => (a[1] < b[1] ? 1 : -1));
+  // Ordena os períodos do mais recente para o mais antigo (pela data)
+  const periodsNewestFirst = old.rows
+    .map((r) => [Number(r.period_index), r.last_update])
+    .sort((a, b) => (a[1] < b[1] ? 1 : -1));
 
   // Voltando no tempo, o period_index só diminui dentro de uma temporada.
   // Se ele aumentar, é porque passamos para a temporada anterior.
@@ -121,27 +129,30 @@ async function migrateOldData(clanTag, seasonId, race) {
     prev = period;
   }
 
-  const statements = old.rows.map((r) => {
-    const s = seasonOfPeriod.get(r.period_index);
-    return {
+  // Um único comando no banco: copia tudo de uma vez (rápido), com a chave nova por período
+  const periods = [...seasonOfPeriod.keys()].map(Number).filter(Number.isFinite);
+  const keyCase = periods.map((p) => `WHEN ${p} THEN ${makeWarKey(seasonOfPeriod.get(p), p)}`).join(' ');
+  const seasonCase = periods.map((p) => `WHEN ${p} THEN ${Number(seasonOfPeriod.get(p))}`).join(' ');
+  const statements = [
+    {
       sql: `
         INSERT OR IGNORE INTO war_log
           (clan_tag, war_key, season_id, section_index, period_index, period_type,
            member_tag, member_name, member_rank, decks_used, decks_total, updated_at)
-        VALUES (?, ?, ?, ?, ?, 'warDay', ?, ?, ?, ?, ?, ?)
+        SELECT clan_tag, CASE period_index ${keyCase} END, CASE period_index ${seasonCase} END,
+               section_index, period_index, 'warDay',
+               member_tag, member_name, member_rank, COALESCE(decks_used, 0), COALESCE(decks_total, 4), COALESCE(updated_at, '')
+        FROM war_days
+        WHERE clan_tag = ? AND is_active = 1 AND member_tag IS NOT NULL
       `,
-      args: [
-        clanTag, makeWarKey(s, r.period_index), s, r.section_index, r.period_index,
-        r.member_tag, r.member_name, r.member_rank, r.decks_used ?? 0, r.decks_total ?? 4, r.updated_at,
-      ],
-    };
-  });
-  statements.push({ sql: `DELETE FROM war_days WHERE clan_tag = ?`, args: [clanTag] });
-  statements.push(trimWarLogStatement(clanTag));
-
+      args: [clanTag],
+    },
+    { sql: `DELETE FROM war_days WHERE clan_tag = ?`, args: [clanTag] },
+    trimWarLogStatement(clanTag),
+  ];
   await withTimeout(turso.batch(statements, 'write'), 25000, 'Turso migração');
-  console.log(`[${clanTag}] Migrados ${old.rows.length} registros antigos para war_log`);
-  return old.rows.length;
+  console.log(`[${clanTag}] Migrados ${totalOld} registros antigos para war_log`);
+  return totalOld;
 }
 
 async function collectClanAttacks(clan) {
@@ -253,10 +264,18 @@ export default async function handler(req, res) {
       clans = clansResult.rows;
     }
 
+    const started = Date.now();
     const results = [];
     for (const clan of clans) {
+      if (Date.now() - started > 40000) {
+        results.push({ clan: clan.tag, status: 'pending_next_run' });
+        continue;
+      }
       try {
-        results.push(await collectClanAttacks(clan));
+        const t0 = Date.now();
+        const r = await collectClanAttacks(clan);
+        r.ms = Date.now() - t0;
+        results.push(r);
       } catch (err) {
         console.error(`[${clan.tag}] Erro na coleta:`, err.message);
         results.push({ clan: clan.tag, error: err.message });
