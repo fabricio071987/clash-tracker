@@ -4,10 +4,9 @@
 // (Os dias de guerra não usam mais cache: o site lê direto da
 //  tabela war_log, que guarda só os últimos 16 dias.)
 // ============================================================
-import { createClient } from '@libsql/client';
-import { ensureCacheTables, refreshPromoCache } from './cache-utils.js';
+import { ensureCacheTables, refreshPromoCache, makeTurso } from './cache-utils.js';
 
-const turso = createClient({ url: process.env.TURSO_DATABASE_URL, authToken: process.env.TURSO_AUTH_TOKEN });
+const turso = makeTurso();
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');

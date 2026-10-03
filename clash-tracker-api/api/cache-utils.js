@@ -14,12 +14,14 @@ import { createClient } from '@libsql/client';
 
 export const MAX_WAR_DAYS = 16;
 
-export function cacheTurso() {
-  return createClient({
-    url: process.env.TURSO_DATABASE_URL,
-    authToken: process.env.TURSO_AUTH_TOKEN,
-  });
+// Conexão com o Turso SEMPRE por HTTP (https://). O endereço "libsql://" usa
+// WebSocket, que fica pendurado entre execuções na Vercel e causa timeouts.
+export function makeTurso() {
+  const url = (process.env.TURSO_DATABASE_URL || '').replace(/^libsql:\/\//i, 'https://');
+  return createClient({ url, authToken: process.env.TURSO_AUTH_TOKEN });
 }
+
+export const cacheTurso = makeTurso;
 
 export async function ensureWarLog(turso) {
   await turso.execute(`

@@ -1,9 +1,6 @@
-import { createClient } from '@libsql/client';
+import { makeTurso } from './cache-utils.js';
 
-const turso = createClient({
-  url: process.env.TURSO_DATABASE_URL,
-  authToken: process.env.TURSO_AUTH_TOKEN,
-});
+const turso = makeTurso();
 
 async function queryTurso(sql) {
   try {

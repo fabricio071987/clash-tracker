@@ -1,10 +1,6 @@
-import { createClient } from '@libsql/client';
-import { refreshPromoCache } from './cache-utils.js'; // usa refreshPromoCache (cache por clã)
+import { refreshPromoCache, makeTurso } from './cache-utils.js'; // usa refreshPromoCache (cache por clã)
 
-const turso = createClient({
-  url: process.env.TURSO_DATABASE_URL,
-  authToken: process.env.TURSO_AUTH_TOKEN,
-});
+const turso = makeTurso();
 
 const ROYALE_API_BASE = process.env.ROYALE_API_BASE || 'http://45.79.218.79/v1';
 
