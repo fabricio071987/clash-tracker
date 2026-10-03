@@ -388,9 +388,30 @@ async function loadClanData(tag) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
 
-    const snap = await fetch(state.apiUrl + '/api/snapshot/' + encodeURIComponent(tag), { signal: controller.signal }).then(r => r.json());
-
+    // Última versão boa fica guardada no navegador. Se o servidor falhar ou
+    // demorar, o site mostra essa cópia em vez de ficar vazio.
+    const storeKey = 'clash-snap:' + tag;
+    let snap = null;
+    try {
+      snap = await fetch(state.apiUrl + '/api/snapshot/' + encodeURIComponent(tag) , { signal: controller.signal }).then(r => r.json());
+    } catch (e) {
+      console.warn('Falha ao buscar snapshot:', e.message);
+    }
     clearTimeout(timeout);
+
+    const fresh = snap && (!snap.errors || snap.errors.length === 0) &&
+      ((snap.war_days && snap.war_days.length) || (snap.promotions && snap.promotions.length));
+    if (fresh) {
+      try { localStorage.setItem(storeKey, JSON.stringify(snap)); } catch (e) {}
+    } else {
+      let saved = null;
+      try { saved = JSON.parse(localStorage.getItem(storeKey) || 'null'); } catch (e) {}
+      if (saved) {
+        snap = saved;
+        state.usingSaved = true;
+      }
+      if (!snap) throw new Error('sem dados');
+    }
 
     state.warDays = snap.war_days || [];
     state.promotions = snap.promotions || [];
@@ -420,7 +441,10 @@ async function loadClanData(tag) {
     }
     state.isActiveMember = isActiveMember;
     
-    setStatus(true, 'Conectado · ' + tag);
+    setStatus(true, state.usingSaved
+      ? 'Conectado · ' + tag + ' (servidor lento, mostrando última versão salva de ' + new Date(snap.generated_at).toLocaleString('pt-BR') + ')'
+      : 'Conectado · ' + tag);
+    state.usingSaved = false;
     render();
   } catch (err) {
     console.warn("Erro ao carregar dados (ou timeout):", err.message);
